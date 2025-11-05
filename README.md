@@ -3,6 +3,8 @@
 **See who your system is talking to — and where they are.**
 
 GeoNetstat isn't just another netstat wrapper. It's a geo-aware connection analyzer that brings transparency to your network traffic with geolocation, organization lookup, and reverse DNS — all in a clean, interactive interface.
+![GeoNetStat Menu](https://github.com/globalcve/geonetstat/raw/main/geonetstat_menu.png)
+
 
 ---
 
