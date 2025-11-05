@@ -1,125 +1,133 @@
 🌍 GeoNetstat
 
 
-A Bash-based geo-aware connection analyzer for Ubuntu/Debian systems
+See who your system is talking to — and where they are.
+
+
+GeoNetstat isn't just another 
+netstat wrapper. It's a geo-aware connection analyzer that brings 
+transparency to your network traffic with geolocation, organization 
+lookup, and reverse DNS — all in a clean, interactive interface.
 
 
 
-📖 Overview
+Why GeoNetstat?
 
 
-GeoNetstat extends traditional netstat and ss functionality by adding geolocation, organization lookup, reverse DNS, and process information for each active network connection.
+Multi-layer visibility
+
+We combine ss and netstat outputs with IP geolocation, organization data, and reverse DNS — with full process attribution.
+Interactive by design
+
+Whiptail-powered GUI menu for quick connection analysis, plus full command-line support for automation.
+Security-first approach
+
+Know exactly which processes are talking to which organizations, in 
+which countries — essential for security audits and monitoring.
+Lightweight and fast
+
+Pure Bash with minimal dependencies. Works on any Ubuntu/Debian system out of the box.
+Built for sysadmins
+
+No bloat, no complexity. Just clean, actionable network intelligence when you need it.
 
 
-It provides both a whiptail-powered interactive menu and command-line mode, making it easy to explore your system's incoming and outgoing connections — and see where they lead.
+
+🚀 Quick Start
 
 
+A network connection analyzer 
+that shows geolocation, organization info, and process details for every
+ active connection on your system.
 
-✨ Features
+
+Features:
 
 
-🧭 Interactive menu (Whiptail GUI) for connection mode selection
+🧭 Interactive Whiptail GUI menu for connection mode selection
 🌍 IP geolocation and organization info via ipinfo.io
 🔎 Reverse DNS resolution for remote hosts
 🔄 Combines ss and netstat outputs for full coverage
-🧩 Displays process/application names linked to each connection
-📡 Detects connection direction (incoming vs outgoing)
-⚡ Works on Ubuntu/Debian-based systems out of the box
+🧩 Process/application names linked to each connection
+📡 Connection direction detection (incoming vs outgoing)
+⚡ Works on Ubuntu/Debian-based systems
 
 
 
-🧰 Dependencies
+📦 Installation
 
 
-Install required packages:
+Dependencies:
 
 
+
+bash
 sudo apt install curl jq net-tools iproute2 dnsutils whiptail
 
 
-
-
-🚀 Usage
-
-
-🪟 Interactive Menu Mode
-
-
-Run without arguments to launch the GeoNetstat Whiptail GUI menu:
-
-
-sudo /path/to/geonetstat.sh
+Download and run:
 
 
 
-You'll see an interactive menu like this:
+bash
+# Clone the repository
+git clone https://github.com/yourusername/geonetstat.git
+cd geonetstat
 
+# Make executable
+chmod +x geonetstat.sh
 
-Choose a connection type:
-
-  ss -tn          Show TCP connections (ss)
-  ss -un          Show UDP connections (ss)
-  ss -tulnp       Show all listening connections (ss)
-  netstat -tn     Show TCP connections (netstat)
-  netstat -un     Show UDP connections (netstat)
-  netstat -tulnp  Show all listening connections (netstat)
-  all             Run all above sequentially
-
-
-
-💻 Command-Line Mode
-
-
-You can also run specific modes directly (bypassing the menu):
-
-
-sudo /path/to/geonetstat.sh ss -un
+# Run with sudo for full visibility
+sudo ./geonetstat.sh
 
 
 
-Or using netstat:
+💻 Usage
 
 
-sudo /path/to/geonetstat.sh netstat -tulnp
+Interactive Menu Mode
 
 
-
-
-📋 Example Output
-
+Run without arguments to launch the interactive menu:
 
 
 
-IP Address
-Organization
-Location
-Reverse DNS
-Direction
-Application
+bash
+sudo ./geonetstat.sh
+
+
+You'll see options for:
+
+
+ss -tn — Show TCP connections (ss)
+ss -un — Show UDP connections (ss)
+ss -tulnp — Show all listening connections (ss)
+netstat -tn — Show TCP connections (netstat)
+netstat -un — Show UDP connections (netstat)
+netstat -tulnp — Show all listening connections (netstat)
+all — Run all above sequentially
+
+
+Command-Line Mode
+
+
+Run specific modes directly:
 
 
 
-
-8.8.8.8
-AS15169 Google LLC
-Mountain View, US
-dns.google
-OUTGOING
-systemd-resolve
-
-
-192.168.0.5
-Local Network
-Local, LAN
-router.local
-INCOMING
-sshd
+bash
+sudo ./geonetstat.sh ss -un
+sudo ./geonetstat.sh netstat -tulnp
 
 
 
+📊 Example Output
 
 
-🧠 How It Works
+IP AddressOrganizationLocationReverse DNSDirectionApplication8.8.8.8AS15169 Google LLCMountain View, USdns.googleOUTGOINGsystemd-resolve192.168.0.5Local NetworkLocal, LANrouter.localINCOMINGsshd104.16.132.229AS13335 CloudflareSan Francisco, UScloudflare.comOUTGOINGfirefox
+
+
+How it works:
 
 
 Collects active connections from ss or netstat
@@ -131,19 +139,40 @@ Displays results in a clean, aligned table
 
 
 
-👨‍💻 Author
+🤝 Contributing
 
 
-Developed by GLOBALCVE
+We welcome PRs, bug fixes, and 
+feature improvements. Whether you're adding new functionality, improving
+ performance, or fixing issues — we'd love your help.
 
 
-"See who your system is talking to — and where they are."
+Areas we'd love help with:
+
+
+Additional geolocation providers
+Export options (CSV, JSON)
+Connection filtering and search
+Performance optimizations
 
 
 
 💡 Tips
 
 
-Run as root for full process visibility
+Run as root (sudo) for full process visibility
 Use all from the menu to aggregate all connection types
-Useful for quick network audits or security monitoring
+Great for quick network audits and security monitoring
+Combine with other tools like iptables or tcpdump for deeper analysis
+
+
+
+📬 Contact
+
+
+GitHub: @globalcve
+Email: globalcve@gmail.com
+
+
+
+Built with transparency, minimalism, and respect for network visibility.
