@@ -2,6 +2,8 @@
   <img src="https://github.com/globalcve/geonetstat/blob/main/GeoNetstat.png" alt="GeoNetstat Banner" />
 </p>
 
+
+
 <p align="center">
   <img src="https://img.shields.io/badge/Shell-Bash-4EAA25?logo=gnu-bash&logoColor=white" />
   <img src="https://img.shields.io/badge/Tool-Netstat%2Fss-blue" />
@@ -12,8 +14,9 @@
 </p>
 
 
-
 **See who your system is talking to — and where they are.**
+
+
 
 ## Why GeoNetstat vs. nmap/Wireshark
 
