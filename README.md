@@ -48,6 +48,8 @@ A network connection analyzer that shows geolocation, organization info, and pro
 - 🧩 Process/application names linked to each connection
 - 📡 Connection direction detection (incoming vs outgoing)
 - ⚡ Works on Ubuntu/Debian-based systems
+- 🔒 Port dictionary & encryption detection — maps common ports to services and flags encrypted protocols.
+- 📊 Compact state indicator (STE) — shows connection state as Active (A), Listening (L), or Inactive (I).
 
 ---
 
