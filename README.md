@@ -1,4 +1,13 @@
 # 🌍 GeoNetstat
+<p align="center">
+  <img src="https://img.shields.io/badge/Shell-Bash-4EAA25?logo=gnu-bash&logoColor=white" />
+  <img src="https://img.shields.io/badge/Tool-Netstat%2Fss-blue" />
+  <img src="https://img.shields.io/badge/GeoIP-ipinfo.io-lightgrey" />
+  <img src="https://img.shields.io/github/license/globalcve/geonetstat" />
+  <img src="https://img.shields.io/badge/Branch-Stable-green?logo=github&logoColor=white" />
+  <img src="https://img.shields.io/github/last-commit/globalcve/geonetstat" />
+</p>
+
 
 **See who your system is talking to — and where they are.**
 
