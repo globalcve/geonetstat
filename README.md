@@ -11,6 +11,27 @@
 
 **See who your system is talking to — and where they are.**
 
+## Why GeoNetstat vs. nmap/Wireshark
+
+GeoNetstat isn’t meant to replace heavyweight tools like **nmap** or **Wireshark** — it’s designed as a **lightweight edition** for everyday visibility:
+
+| Tool        | Typical Use Case              | What You Get                                                                 | Overhead                                                   |
+|-------------|-------------------------------|-------------------------------------------------------------------------------|------------------------------------------------------------|
+| **nmap**    | Active scanning of hosts/networks | Port scans, service detection, vulnerability probing                          | Requires elevated privileges, can be intrusive             |
+| **Wireshark** | Full packet capture & analysis | Deep protocol inspection, traffic replay, forensic detail                      | Heavy GUI, large captures, steep learning curve            |
+| **GeoNetstat** | Quick connection awareness    | IP, Org, Location, Reverse DNS, Direction, Application, Port→Service mapping, Encryption flag, STE (A/L/I) | Lightweight, terminal‑only, no packet capture, no intrusive scans |
+
+### ✨ Why GeoNetstat feels different
+
+- **No root scans or packet captures** — it simply enriches what your system already knows (`ss`/`netstat`).
+- **Human‑readable enrichment** — org, geo, reverse DNS, service mapping, encryption flags.
+- **Compact state indicator (STE)** — shows Active, Listening, or Inactive at a glance.
+- **Menu‑driven workflow** — ncurses interface makes it easy to run multiple views without memorizing flags.
+- **Contributor‑friendly** — simple Bash, clear dependencies, easy to extend.
+
+Think of GeoNetstat as the **“fast visibility layer”**: when you don’t need a full scan or packet dump, but you *do* want to know who you’re talking to, what port, what service, and whether it’s encrypted — instantly, in your terminal.
+
+
 GeoNetstat isn't just another netstat wrapper. It's a geo-aware connection analyzer that brings transparency to your network traffic with geolocation, organization lookup, and reverse DNS — all in a clean, interactive interface.
 ![GeoNetStat Menu](https://github.com/globalcve/geonetstat/raw/main/geonetstat_menu.png)
 
