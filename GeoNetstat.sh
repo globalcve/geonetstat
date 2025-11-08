@@ -82,9 +82,18 @@ echo "--------------------------------------------------------------------------
 
 # Loop through connections
 echo "$CONNS" | while read PROTO LOCAL REMOTE STATE PROC; do
-  IP=$(echo "$REMOTE" | cut -d: -f1)
-  PORT=$(echo "$REMOTE" | awk -F: '{print $NF}')
+  if [[ "$STATE" == "LISTEN" ]]; then
+    IP=$(echo "$LOCAL" | cut -d: -f1)
+    PORT=$(echo "$LOCAL" | awk -F: '{print $NF}')
+    DIR="INCOMING"
+  else
+    IP=$(echo "$REMOTE" | cut -d: -f1)
+    PORT=$(echo "$REMOTE" | awk -F: '{print $NF}')
+    DIR="OUTGOING"
+  fi
+
   [[ "$IP" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || continue
+
 
   INFO=$(curl -s "https://ipinfo.io/$IP/json")
   ORG=$(echo "$INFO" | jq -r '.org // "Unknown"')
