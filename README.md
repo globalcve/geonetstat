@@ -28,7 +28,7 @@ GeoNetstat isn’t meant to replace heavyweight tools like **nmap** or **Wiresha
 | **Wireshark** | Full packet capture & analysis | Deep protocol inspection, traffic replay, forensic detail                      | Heavy GUI, large captures, steep learning curve            |
 | **GeoNetstat** | Quick connection awareness    | IP, Org, Location, Reverse DNS, Direction, Application, Port→Service mapping, Encryption flag, STE (A/L/I) | Lightweight, terminal‑only, no packet capture, no intrusive scans |
 
-### ✨ Why GeoNetstat feels different
+### > Lightweight / Minimal Dependencies 
 
 - **No root scans or packet captures** — it simply enriches what your system already knows (`ss`/`netstat`).
 - **Human‑readable enrichment** — org, geo, reverse DNS, service mapping, encryption flags.
@@ -45,7 +45,7 @@ GeoNetstat isn't just another netstat wrapper. It's a geo-aware connection analy
 
 ---
 
-## Why GeoNetstat?
+## > Simple, yet powerful
 
 - **Multi-layer visibility**  
   We combine `ss` and `netstat` outputs with IP geolocation, organization data, and reverse DNS — with full process attribution.
@@ -64,7 +64,7 @@ GeoNetstat isn't just another netstat wrapper. It's a geo-aware connection analy
 
 ---
 
-## 🚀 Quick Start
+## > Quick Start
 
 A network connection analyzer that shows geolocation, organization info, and process details for every active connection on your system.
 
@@ -81,7 +81,7 @@ A network connection analyzer that shows geolocation, organization info, and pro
 
 ---
 
-## 📦 Installation
+## > Installation
 
 **Dependencies:**
 
@@ -105,7 +105,7 @@ sudo ./geonetstat.sh
 
 ---
 
-## 💻 Usage
+## > Usage
 
 ### Interactive Menu Mode
 
@@ -135,7 +135,7 @@ sudo ./geonetstat.sh netstat -tulnp
 
 ---
 
-## 📊 Example Output
+## > Example Output
 
 | IP Address | Organization | Location | Reverse DNS | Direction | Application |
 |------------|--------------|----------|-------------|-----------|-------------|
@@ -153,7 +153,7 @@ sudo ./geonetstat.sh netstat -tulnp
 
 ---
 
-## 🤝 Contributing
+## > Contributing
 
 We welcome PRs, bug fixes, and feature improvements. Whether you're adding new functionality, improving performance, or fixing issues — we'd love your help.
 
@@ -165,7 +165,7 @@ We welcome PRs, bug fixes, and feature improvements. Whether you're adding new f
 
 ---
 
-## 💡 Tips
+## > Hot Tips
 
 - Run as root (`sudo`) for full process visibility
 - Use `all` from the menu to aggregate all connection types
@@ -174,7 +174,7 @@ We welcome PRs, bug fixes, and feature improvements. Whether you're adding new f
 
 ---
 
-## 📬 Contact
+## > Contact :D
 
 - GitHub: [@globalcve](https://github.com/globalcve)
 - Email: globalcve@gmail.com
