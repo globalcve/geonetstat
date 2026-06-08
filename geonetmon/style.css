@@ -1,0 +1,117 @@
+/* GeoNetMon structural styling.
+ *
+ * Colours are referenced as @gnm_* named tokens; the actual values are
+ * supplied at runtime by themes.py, which prepends an @define-color block
+ * for the active theme. Edit layout/structure here; edit palettes in
+ * themes.py. */
+
+.mono       { font-family: monospace; }
+.bold       { font-weight: 700; }
+.heading    { font-weight: 700; font-size: 1.05em; }
+.title      { font-weight: 700; }
+
+/* --- Connection prompt (allow/deny popup) --- */
+/* Destination: large + fully opaque so it's readable on any theme. */
+.prompt-dest { font-size: 1.05em; }
+.prompt-path { font-family: monospace; font-size: 0.85em; }
+.prompt-explain {
+    margin-top: 2px;
+    padding: 8px 10px;
+    border-radius: 7px;
+    background-color: alpha(@gnm_accent, 0.12);
+    border: 1px solid alpha(@gnm_accent, 0.35);
+}
+/* Catppuccin allow/deny buttons — green/red from the active palette. */
+.prompt-allow, .prompt-deny {
+    font-weight: 700;
+    border: none;
+    box-shadow: none;
+    background-image: none;
+    padding: 8px 14px;
+    border-radius: 8px;
+}
+.prompt-allow { background-color: @gnm_enc_ok; color: @gnm_bg; }
+.prompt-deny  { background-color: @gnm_enc_bad; color: @gnm_bg; }
+.prompt-allow:hover { background-color: alpha(@gnm_enc_ok, 0.85); }
+.prompt-deny:hover  { background-color: alpha(@gnm_enc_bad, 0.85); }
+
+/* New connection flash */
+.newconn {
+    background-color: alpha(@gnm_new, 0.28);
+    border-radius: 5px;
+    padding-left: 4px;
+    padding-right: 4px;
+}
+
+/* Geolocation / foreign hosts */
+.foreign    { color: @gnm_foreign; font-weight: 600; }
+
+/* Direction */
+.dir-in     { color: @gnm_dir_in; font-weight: 600; }
+.dir-out    { color: @gnm_dir_out; }
+.listen     { color: @gnm_listen; font-weight: 600; }
+
+/* Encryption */
+.enc-ok     { color: @gnm_enc_ok; font-weight: 600; }
+.enc-bad    { color: @gnm_enc_bad; font-weight: 600; }
+
+.statusbar {
+    padding: 5px 12px;
+    border-top: 1px solid alpha(currentColor, 0.12);
+    font-size: 0.9em;
+}
+
+.privbar {
+    background-color: alpha(@gnm_warn, 0.18);
+    border-bottom: 1px solid alpha(@gnm_warn, 0.4);
+}
+
+/* Alert button pulse when unread alerts exist */
+.has-alerts {
+    background-color: alpha(@gnm_foreign, 0.30);
+}
+
+columnview > listview > row cell {
+    padding-top: 2px;
+    padding-bottom: 2px;
+}
+
+/* Quick-filter chip buttons */
+button.pill {
+    border-radius: 9999px;
+    padding: 2px 10px;
+    font-size: 0.88em;
+    min-height: 0;
+}
+
+/* Privacy / shoulder-surfer blur (system theme fallback) */
+label.privacy-blur {
+    color: transparent;
+    text-shadow: 0 0 7px rgba(180, 180, 180, 0.9);
+}
+
+/* macOS "traffic light" window controls. Fixed colours (theme-independent), so
+   they read the same in every theme. The class selectors out-specify the
+   themed `headerbar button` rule, so they keep their colour. */
+.traffic-lights {
+    margin-left: 8px;
+    margin-right: 6px;
+}
+.traffic-lights button.tl {
+    min-width: 13px;
+    min-height: 13px;
+    padding: 0;
+    margin: 0;
+    border-radius: 9999px;
+    border: none;
+    box-shadow: none;
+    -gtk-icon-shadow: none;
+}
+/* `background` shorthand (not just -color) to override the theme's gradient, and
+   the `.traffic-lights button.X` selector out-specifies `headerbar button`. */
+.traffic-lights button.tl-close { background: #ff5f57; }
+.traffic-lights button.tl-min   { background: #febc2e; }
+.traffic-lights button.tl-max   { background: #28c840; }
+.traffic-lights button.tl-close:hover { background: #ff4439; }
+.traffic-lights button.tl-min:hover   { background: #f5a623; }
+.traffic-lights button.tl-max:hover   { background: #1faf33; }

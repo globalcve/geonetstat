@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="260" viewBox="0 0 1200 260">
+  <!-- background -->
+  <rect width="1200" height="260" rx="22" fill="#11111b"/>
+  <rect x="4" y="4" width="1192" height="252" rx="18" fill="#1e1e2e"/>
+
+  <!-- subtle decorative arc — geo motif in background -->
+  <circle cx="130" cy="130" r="200" fill="none" stroke="#cdd6f4" stroke-width="1" opacity="0.04"/>
+  <circle cx="130" cy="130" r="155" fill="none" stroke="#cdd6f4" stroke-width="1" opacity="0.04"/>
+
+  <!-- orbit rings around icon -->
+  <circle cx="130" cy="130" r="66" fill="none" stroke="#cdd6f4" stroke-width="1.5" opacity="0.10"/>
+  <circle cx="130" cy="130" r="46" fill="none" stroke="#cdd6f4" stroke-width="1.5" opacity="0.07"/>
+
+  <!-- connection lines (original coords scaled by 0.78, recentred at 130,130) -->
+  <line x1="130" y1="130" x2="79"  y2="86"  stroke="#89b4fa" stroke-width="4" stroke-linecap="round" opacity="0.55"/>
+  <line x1="130" y1="130" x2="183" y2="79"  stroke="#a6e3a1" stroke-width="4" stroke-linecap="round" opacity="0.55"/>
+  <line x1="130" y1="130" x2="188" y2="169" stroke="#fab387" stroke-width="4" stroke-linecap="round" opacity="0.55"/>
+  <line x1="130" y1="130" x2="82"  y2="185" stroke="#94e2d5" stroke-width="4" stroke-linecap="round" opacity="0.55"/>
+
+  <!-- peer nodes -->
+  <circle cx="79"  cy="86"  r="12" fill="#89b4fa"/>
+  <circle cx="79"  cy="86"  r="12" fill="none" stroke="#1e1e2e" stroke-width="2.5"/>
+  <circle cx="183" cy="79"  r="12" fill="#a6e3a1"/>
+  <circle cx="183" cy="79"  r="12" fill="none" stroke="#1e1e2e" stroke-width="2.5"/>
+  <circle cx="188" cy="169" r="12" fill="#fab387"/>
+  <circle cx="188" cy="169" r="12" fill="none" stroke="#1e1e2e" stroke-width="2.5"/>
+  <circle cx="82"  cy="185" r="12" fill="#94e2d5"/>
+  <circle cx="82"  cy="185" r="12" fill="none" stroke="#1e1e2e" stroke-width="2.5"/>
+
+  <!-- central node -->
+  <circle cx="130" cy="130" r="24" fill="#cba6f7"/>
+  <circle cx="130" cy="130" r="24" fill="none" stroke="#1e1e2e" stroke-width="3.5"/>
+  <circle cx="130" cy="130" r="9"  fill="#1e1e2e"/>
+
+  <!-- divider -->
+  <line x1="248" y1="36" x2="248" y2="224" stroke="#cdd6f4" stroke-width="1" opacity="0.08"/>
+
+  <!-- wordmark -->
+  <text x="288" y="118"
+        font-family="'SF Pro Display','Inter','Segoe UI',system-ui,sans-serif"
+        font-size="66" font-weight="700" letter-spacing="-1.5"
+        fill="#cdd6f4">GeoNetMon</text>
+
+  <!-- tagline -->
+  <text x="291" y="158"
+        font-family="'SF Pro Display','Inter','Segoe UI',system-ui,sans-serif"
+        font-size="22" font-weight="400"
+        fill="#cba6f7" opacity="0.80">Network monitor and interactive firewall for Linux</text>
+</svg>

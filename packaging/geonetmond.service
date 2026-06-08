@@ -1,0 +1,26 @@
+[Unit]
+Description=GeoNetMon interactive firewall daemon
+Documentation=https://github.com/jegly/geonetmon
+After=network.target nftables.service
+Wants=network.target
+
+[Service]
+Type=simple
+# Adjust the path if you install elsewhere than /opt/geonetmon
+ExecStart=/usr/bin/python3 -m geonetmon.daemon_main
+WorkingDirectory=/opt/geonetmon
+Restart=on-failure
+RestartSec=2
+
+# Needs root for NFQUEUE + nft + /proc/<pid> of other users.
+# We keep a few hardening knobs that are compatible with that need.
+User=root
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW CAP_DAC_READ_SEARCH
+NoNewPrivileges=no
+ProtectHome=read-only
+ProtectSystem=full
+RuntimeDirectory=geonetmon
+RuntimeDirectoryMode=0750
+
+[Install]
+WantedBy=multi-user.target

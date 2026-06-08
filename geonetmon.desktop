@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=GeoNetMon
+Comment=Real-time geo-aware network connection monitor
+Exec=sh -c 'cd %k/.. && python3 -m geonetmon'
+Icon=network-workgroup
+Terminal=false
+Categories=Network;System;Monitor;
+Keywords=network;connections;netstat;ss;monitor;security;
+StartupWMClass=com.jegly.GeoNetMon

@@ -1,0 +1,29 @@
+# built packages
+*.deb
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# GeoLite2 databases (large, user-supplied)
+*.mmdb
+
+# Runtime files
+/run/geonetmon.sock
+/run/geonetmon-procs.json
+
+# Local config and cache (user data, not source)
+~/.config/geonetmon/
+~/.cache/geonetmon/
+
+# Editor / OS
+.DS_Store
+.vscode/
+*.swp
+*~
+
+# Internal dev notes
+HANDOFF.md
