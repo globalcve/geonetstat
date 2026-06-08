@@ -385,4 +385,4 @@ Requires `dpkg-deb` and Python 3.10+ on the build machine. No compiled component
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
+GPL 3.0 
