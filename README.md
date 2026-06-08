@@ -15,7 +15,7 @@
 [![Download GeoNetMon .deb](https://img.shields.io/badge/Download-Latest_.deb-A6E3A1?style=for-the-badge&logo=linux&logoColor=1E1E2E)](https://github.com/jegly/GeoNetMon/releases/latest)
 
 ```bash
-sudo dpkg -i geonetmon_<version>_all.deb
+sudo dpkg -i geonetmon_1.0.0_all.deb
 ```
 
 The package installs dependencies, creates the `geonetmon` system group, adds your user to it, and starts the background daemon. Log out and back in after install, then launch from your application menu or run `geonetmon`.
