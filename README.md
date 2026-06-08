@@ -34,7 +34,7 @@ GeoNetMon is a GTK4 network monitor and interactive firewall for Linux. It has t
 The GUI runs as your normal user in both modes. A small privileged daemon (`geonetmond`) handles packet interception via nftables and NFQUEUE and publishes process names to a world-readable file — the GUI never needs root.
 
 > [!TIP]
-> GeoNetMon works well alongside **UFW**. Use GeoNetMon for real-time interactive decisions — allow or deny a specific app's connection the moment it happens — and UFW for persistent blanket rules (block a port, restrict a range). The two don't conflict. UFW is also available as the backend for GeoNetMon's manual IP block feature, so blocks you apply from the connection table are written as proper UFW rules and survive reboots.
+> GeoNetMon works well alongside a traditional firewall. Use GeoNetMon for real-time interactive decisions — allow or deny a specific app's connection the moment it happens — and your firewall for persistent blanket rules (block a port, restrict a range). GeoNetMon supports **UFW**, **nftables**, and **iptables** as backends for its manual IP block feature. UFW is recommended for most users as blocks are written as proper UFW rules and survive reboots; nftables and iptables blocks are re-applied from GeoNetMon's own record on each change.
 
 ---
 
