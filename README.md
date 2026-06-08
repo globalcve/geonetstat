@@ -37,7 +37,32 @@ The GUI runs as your normal user in both modes. A small privileged daemon (`geon
 
 ## Screenshots
 
-<!-- Add screenshots here -->
+<div align="center">
+
+<table>
+  <tr>
+    <td align="center"><img src="https://raw.githubusercontent.com/jegly/GeoNetMon/main/images/overview.png" width="420"/><br/><sub>Overview — light mode</sub></td>
+    <td align="center"><img src="https://raw.githubusercontent.com/jegly/GeoNetMon/main/images/overview_darkmode.png" width="420"/><br/><sub>Overview — dark mode with past connections</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="https://raw.githubusercontent.com/jegly/GeoNetMon/main/images/allow_deny_popup.png" width="420"/><br/><sub>Allow / deny prompt</sub></td>
+    <td align="center"><img src="https://raw.githubusercontent.com/jegly/GeoNetMon/main/images/overview_connection_allowed_notification.png" width="420"/><br/><sub>Connection allowed — GNOME notification</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="https://raw.githubusercontent.com/jegly/GeoNetMon/main/images/connection_Details_darkmode.png" width="420"/><br/><sub>Connection details</sub></td>
+    <td align="center"><img src="https://raw.githubusercontent.com/jegly/GeoNetMon/main/images/darkmode_statistics.png" width="420"/><br/><sub>Statistics</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="https://raw.githubusercontent.com/jegly/GeoNetMon/main/images/blocklist.png" width="420"/><br/><sub>Blocklist subscriptions</sub></td>
+    <td align="center"><img src="https://raw.githubusercontent.com/jegly/GeoNetMon/main/images/darkmode_overview_preferences.png" width="420"/><br/><sub>Preferences — appearance</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="https://raw.githubusercontent.com/jegly/GeoNetMon/main/images/overview_darkmode_pref.png" width="420"/><br/><sub>Preferences — alerts and history</sub></td>
+    <td></td>
+  </tr>
+</table>
+
+</div>
 
 ---
 
