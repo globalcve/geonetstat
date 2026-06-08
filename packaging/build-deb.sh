@@ -111,12 +111,18 @@ if [ "$1" = remove ] || [ "$1" = purge ] || [ "$1" = upgrade ]; then
     if [ -d /run/systemd/system ]; then
         systemctl disable --now geonetmond.service 2>/dev/null || true
     fi
+    # Always flush nft tables so traffic is never silently blocked after removal
+    nft delete table inet geonetmon_enforce 2>/dev/null || true
+    nft delete table inet geonetmon 2>/dev/null || true
 fi
 exit 0
 EOF
 cat > "$STAGE/DEBIAN/postrm" <<'EOF'
 #!/bin/sh
 set -e
+# Belt-and-braces: flush nft tables even if prerm didn't run (e.g. after a crash)
+nft delete table inet geonetmon_enforce 2>/dev/null || true
+nft delete table inet geonetmon 2>/dev/null || true
 if [ "$1" = purge ]; then
     rm -f /run/geonetmon-procs.json /run/geonetmon.sock 2>/dev/null || true
 fi

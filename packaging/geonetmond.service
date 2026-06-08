@@ -8,9 +8,12 @@ Wants=network.target
 Type=simple
 # Adjust the path if you install elsewhere than /opt/geonetmon
 ExecStart=/usr/bin/python3 -m geonetmon.daemon_main
+ExecStopPost=/usr/sbin/nft delete table inet geonetmon_enforce 2>/dev/null; true
+ExecStopPost=/usr/sbin/nft delete table inet geonetmon 2>/dev/null; true
 WorkingDirectory=/opt/geonetmon
 Restart=on-failure
 RestartSec=2
+TimeoutStopSec=5
 
 # Needs root for NFQUEUE + nft + /proc/<pid> of other users.
 # We keep a few hardening knobs that are compatible with that need.
