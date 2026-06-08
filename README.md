@@ -9,7 +9,6 @@
 [![Firewall](https://img.shields.io/badge/Firewall-nftables%20%2B%20NFQUEUE-FF5555.svg)]()
 [![GeoIP](https://img.shields.io/badge/GeoIP-GeoLite2%20%2B%20ipinfo-50FA7B.svg)]()
 [![Package](https://img.shields.io/badge/Package-.deb-6272A4.svg)]()
-[![License](https://img.shields.io/badge/License-MIT-F1FA8C.svg)](LICENSE)
 
 ## Download
 
