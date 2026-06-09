@@ -53,9 +53,13 @@ class PromptWindow(Gtk.Window):
         cc = (flow.get("country") or "").upper()
         flag = (ports.flag_emoji(cc) + " ") if cc else ""
         org = flow.get("org") or ""
+        dst_ip = flow.get("dst_ip") or ""
+        dst_host = flow.get("dst_host") or ""
+        ip_part = dst_ip if (unknown and dst_ip and dst_ip != dst_host) else ""
         meta = "  ·  ".join(
             p for p in (flow.get("proto", "").upper(),
-                        f"{flag}{org}".strip(), f"port {flow.get('dst_port','?')}")
+                        f"{flag}{org}".strip(), ip_part,
+                        f"port {flow.get('dst_port','?')}")
             if p)
         detail = Gtk.Label(xalign=0, wrap=True, selectable=True)
         detail.set_markup(f"<span alpha='90%'>{GLib.markup_escape_text(meta)}</span>")
@@ -79,9 +83,9 @@ class PromptWindow(Gtk.Window):
 
         # "Remember this for…" — plain-English durations.
         box.append(self._sep())
-        self._dur_keys = ["once", "process", "session", "forever"]
-        dur_labels = ["Once", f"Until {self._app_name} quits",
-                      "Until restart", "Forever"]
+        self._dur_keys = ["once", "60", "600", "3600", "process", "session", "forever"]
+        dur_labels = ["Once", "For 1 minute", "For 10 minutes", "For 1 hour",
+                      f"Until {self._app_name} quits", "Until restart", "Forever"]
         self.scope_combo = Gtk.DropDown.new_from_strings(dur_labels)
         cur_scope = config.get("enforce_default_scope", "forever")
         if cur_scope not in self._dur_keys:
@@ -162,6 +166,9 @@ class PromptWindow(Gtk.Window):
         }.get(by, f"only {app} → {host}:{port}")
         when = {
             "once": "this time only",
+            "60": "for 1 minute",
+            "600": "for 10 minutes",
+            "3600": "for 1 hour",
             "process": f"until {app} quits",
             "session": "until restart",
             "forever": "forever",

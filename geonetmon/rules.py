@@ -45,11 +45,12 @@ SCOPE_BY = {
 class Rule:
     __slots__ = ("id", "action", "enabled", "scope", "process", "process_path",
                  "dst_ip", "dst_host", "dst_port", "proto", "direction",
-                 "created", "hits", "note", "_consumed")
+                 "created", "hits", "note", "expires", "_consumed")
 
     def __init__(self, action, scope="forever", process=None, process_path=None,
                  dst_ip=None, dst_host=None, dst_port=None, proto=None,
-                 direction=None, note="", rid=None, created=None, hits=0):
+                 direction=None, note="", rid=None, created=None, hits=0,
+                 expires=None):
         self.id = rid or uuid.uuid4().hex[:12]
         self.action = action
         self.enabled = True
@@ -64,11 +65,14 @@ class Rule:
         self.created = created or time.time()
         self.hits = hits
         self.note = note
+        self.expires = expires
         self._consumed = False
 
     # ---- matching -------------------------------------------------------
     def matches(self, flow):
         if not self.enabled or self._consumed:
+            return False
+        if self.expires is not None and time.time() > self.expires:
             return False
         if self.proto and flow.get("proto") != self.proto:
             return False
@@ -99,6 +103,7 @@ class Rule:
             "dst_host": self.dst_host, "dst_port": self.dst_port,
             "proto": self.proto, "direction": self.direction,
             "created": self.created, "hits": self.hits, "note": self.note,
+            "expires": self.expires,
         }
 
     @classmethod
@@ -110,6 +115,7 @@ class Rule:
             dst_port=d.get("dst_port"), proto=d.get("proto"),
             direction=d.get("direction"), note=d.get("note", ""),
             rid=d.get("id"), created=d.get("created"), hits=d.get("hits", 0),
+            expires=d.get("expires"),
         )
         r.enabled = bool(d.get("enabled", True))
         return r
@@ -266,6 +272,15 @@ class Rules:
         """Drop session/once rules (called on quit or on demand)."""
         self.rules = [r for r in self.rules if r.scope == "forever"]
 
+    def prune_expired(self):
+        """Drop timed rules whose expiry has passed. Returns True if anything changed."""
+        now = time.time()
+        keep = [r for r in self.rules if r.expires is None or r.expires > now]
+        if len(keep) != len(self.rules):
+            self.rules = keep
+            return True
+        return False
+
     def prune_processes(self):
         """Drop 'while the app is running' rules whose program has exited.
 
@@ -285,7 +300,11 @@ class Rules:
         allow covers all of an app's traffic — TCP *and* UDP/QUIC (Firefox's
         HTTP/3), in and out. Only "exact" pins proto + direction.
         """
-        kw = {"action": action, "scope": scope}
+        expires = None
+        if scope.lstrip("-").isdigit():
+            expires = time.time() + int(scope)
+            scope = "session"
+        kw = {"action": action, "scope": scope, "expires": expires}
         proc = _basename(flow.get("process"))
         path = flow.get("process_path")
         if scope_by == "app_host":

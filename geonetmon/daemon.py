@@ -250,7 +250,9 @@ class Daemon:
             except Exception:  # noqa: BLE001 — never let this kill the daemon
                 pass
             try:
-                if self.rules.prune_processes():
+                changed = self.rules.prune_processes()
+                changed = self.rules.prune_expired() or changed
+                if changed:
                     self._broadcast(self._rules_msg())
             except Exception:  # noqa: BLE001
                 pass

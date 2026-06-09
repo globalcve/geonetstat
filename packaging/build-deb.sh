@@ -8,7 +8,7 @@
 #
 set -euo pipefail
 
-BASE_VERSION="1.0.0"
+BASE_VERSION="1.0.1"
 # Unique, monotonically-increasing version per build. dpkg/apt compare VERSION
 # strings, so without this an "install" over the same 1.0.0 is a silent no-op
 # (old code keeps running). The +buildTIMESTAMP suffix forces a real upgrade.
@@ -50,10 +50,10 @@ cat > "$STAGE/usr/share/applications/com.jegly.GeoNetMon.desktop" <<'EOF'
 Type=Application
 Name=GeoNetMon
 Comment=Real-time geo-aware network monitor & interactive firewall
-Exec=sg geonetmon -c geonetmon
+Exec=geonetmon
 Icon=geonetmon
 Terminal=false
-Categories=Network;System;Monitor;Security;
+Categories=Network;Monitor;Security;
 Keywords=network;connections;firewall;monitor;security;geoip;
 StartupWMClass=com.jegly.GeoNetMon
 EOF
@@ -108,6 +108,7 @@ cat > "$STAGE/DEBIAN/prerm" <<'EOF'
 #!/bin/sh
 set -e
 if [ "$1" = remove ] || [ "$1" = purge ] || [ "$1" = upgrade ]; then
+    pkill -f 'python3 -m geonetmon$' 2>/dev/null || true
     if [ -d /run/systemd/system ]; then
         systemctl disable --now geonetmond.service 2>/dev/null || true
     fi

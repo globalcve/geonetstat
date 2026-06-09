@@ -69,6 +69,7 @@
 /* Alert button pulse when unread alerts exist */
 .has-alerts {
     background-color: alpha(@gnm_foreign, 0.30);
+    border-radius: 6px;
 }
 
 columnview > listview > row cell {

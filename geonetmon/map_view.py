@@ -270,8 +270,7 @@ class MapWindow(Gtk.Window):
         toolbar.append(self._count_label)
 
         for label, kind in [("All", None), ("Outgoing", "out"),
-                             ("Incoming", "in"), ("Foreign", "foreign"),
-                             ("High-risk", "risk")]:
+                             ("Incoming", "in"), ("Foreign", "foreign")]:
             b = Gtk.ToggleButton(label=label)
             b.set_active(kind is None)
             b.connect("toggled", self._on_filter, kind)
@@ -293,19 +292,6 @@ class MapWindow(Gtk.Window):
         self.map.set_on_right_pick(self._on_map_right_click)
         map_box.append(self.map)
 
-        legend = Gtk.Label(xalign=0.5)
-        legend.add_css_class("dim-label")
-        legend.set_margin_top(4)
-        legend.set_margin_bottom(4)
-        legend.set_markup(
-            "  <span foreground='#5ba6dc'>● outgoing</span>   "
-            "<span foreground='#e8ab4d'>● incoming</span>   "
-            "<span foreground='#ff8c4d'>● foreign</span>   "
-            "<span foreground='#e64d4d'>● high-risk</span>   "
-            "<small>Click a dot for details. Set Home country in Preferences "
-            "to draw arcs.</small>"
-        )
-        map_box.append(legend)
         paned.set_start_child(map_box)
         paned.set_resize_start_child(True)
         paned.set_shrink_start_child(False)
@@ -335,6 +321,7 @@ class MapWindow(Gtk.Window):
 
         # ── bottom: detail panel ─────────────────────────────────────────────
         self._detail = _DetailPanel()
+        self._detail.set_visible(False)
         vbox.append(self._detail)
 
         self.refresh()
@@ -393,9 +380,10 @@ class MapWindow(Gtk.Window):
 
     def _on_map_pick(self, p):
         if p is None:
-            self._detail.clear()
+            self._detail.set_visible(False)
             self._listbox.unselect_all()
             return
+        self._detail.set_visible(True)
         self._detail.show_point(p)
         ip = p.get("ip", "")
         row = self._rows.get(ip)
@@ -407,6 +395,7 @@ class MapWindow(Gtk.Window):
         p = getattr(row, "_point", None)
         if p is None:
             return
+        self._detail.set_visible(True)
         self._detail.show_point(p)
         self.map.select_point(p)
 
