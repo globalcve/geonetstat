@@ -8,7 +8,7 @@
 #
 set -euo pipefail
 
-BASE_VERSION="1.0.1"
+BASE_VERSION="1.0.2"
 # Unique, monotonically-increasing version per build. dpkg/apt compare VERSION
 # strings, so without this an "install" over the same 1.0.0 is a silent no-op
 # (old code keeps running). The +buildTIMESTAMP suffix forces a real upgrade.

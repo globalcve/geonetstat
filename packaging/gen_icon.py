@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Generate the GeoNetMon app icon — a Catppuccin Mocha network/geo motif:
 a central host node with connections radiating to geolocated peers."""
+import shutil
+import subprocess
 import sys
-import cairosvg
+import tempfile
 
 # Catppuccin Mocha
 BASE = "#1e1e2e"
@@ -51,5 +53,37 @@ svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewB
 </svg>"""
 
 out = sys.argv[1] if len(sys.argv) > 1 else "geonetmon.png"
-cairosvg.svg2png(bytestring=svg.encode(), write_to=out, output_width=256, output_height=256)
+
+
+def _render(svg_bytes, dest):
+    """Rasterize the SVG to a 256x256 PNG. Prefer cairosvg; fall back to any
+    SVG rasterizer on the system so the build doesn't hard-depend on Pillow."""
+    try:
+        import cairosvg
+        cairosvg.svg2png(bytestring=svg_bytes, write_to=dest,
+                         output_width=256, output_height=256)
+        return
+    except ImportError:
+        pass
+    with tempfile.NamedTemporaryFile("wb", suffix=".svg", delete=False) as fh:
+        fh.write(svg_bytes)
+        src = fh.name
+    if shutil.which("rsvg-convert"):
+        cmd = ["rsvg-convert", "-w", "256", "-h", "256", src, "-o", dest]
+    elif shutil.which("inkscape"):
+        cmd = ["inkscape", src, "-w", "256", "-h", "256", "-o", dest]
+    elif shutil.which("magick"):
+        cmd = ["magick", "-background", "none", "-density", "384",
+               src, "-resize", "256x256", dest]
+    elif shutil.which("convert"):
+        cmd = ["convert", "-background", "none", "-density", "384",
+               src, "-resize", "256x256", dest]
+    else:
+        raise SystemExit(
+            "no SVG rasterizer found (install python3-cairosvg, librsvg2-bin, "
+            "inkscape, or imagemagick)")
+    subprocess.run(cmd, check=True)
+
+
+_render(svg.encode(), out)
 print("wrote", out)

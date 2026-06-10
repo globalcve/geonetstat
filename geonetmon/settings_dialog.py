@@ -3,6 +3,7 @@
 from gi.repository import Gtk
 
 from . import themes
+from . import ports
 
 
 class SettingsWindow(Gtk.Window):
@@ -96,11 +97,16 @@ class SettingsWindow(Gtk.Window):
         self.entry_token.connect("changed", self._set_text, "ipinfo_token")
         box.append(self._row("ipinfo.io token", self.entry_token))
 
-        self.entry_home = Gtk.Entry(text=config["home_country"])
-        self.entry_home.set_placeholder_text("e.g. GB — others are flagged foreign")
-        self.entry_home.set_max_length(2)
-        self.entry_home.connect("changed", self._set_text, "home_country")
-        box.append(self._row("Home country (ISO-2)", self.entry_home))
+        # Pick Home by name (no need to know ISO codes). Only countries we can
+        # place on the map are offered, so any choice yields a Home origin — and
+        # the connection arcs / flowing packets that radiate from it.
+        home_codes = [""] + sorted(ports.CAPITAL_COORDS, key=ports.country_name)
+        home_labels = ["None (everywhere is foreign)"] + [
+            ports.country_name(c) for c in home_codes[1:]]
+        self.drop_home = self._labeled_drop(
+            home_labels, home_codes, (config["home_country"] or "").upper(),
+            "home_country")
+        box.append(self._row("Home country", self.drop_home))
 
         adj_ttl = Gtk.Adjustment(
             value=config["cache_ttl_hours"], lower=1, upper=2160,

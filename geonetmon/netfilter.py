@@ -36,6 +36,46 @@ except ImportError:
 NFT_TABLE = "geonetmon_enforce"
 _TCP, _UDP = 6, 17
 
+# IPv6 extension headers we must skip to reach the real L4 protocol. Each uses
+# next-header at byte 0 and a length field at byte 1; only the unit differs.
+# 0 Hop-by-Hop, 43 Routing, 60 Destination Options, 135 Mobility -> (len+1)*8.
+_IP6_EXT_LEN8 = {0, 43, 60, 135}
+_IP6_FRAGMENT = 44          # fixed 8 bytes; frag offset !=0 means no L4 here
+_IP6_AH = 51                # Authentication Header -> (len+2)*4 bytes
+_IP6_NO_L4 = {50, 59}       # ESP (encrypted), No Next Header -> unparseable
+
+
+def _ipv6_upper(payload):
+    """Walk the IPv6 extension-header chain and return (proto, l4_bytes) for
+    the real upper layer, or (None, b"") if it isn't a parseable TCP/UDP flow.
+
+    Without this, a fixed offset-40 read treats ANY packet carrying an
+    extension header (fragments, hop-by-hop, etc.) as non-TCP/UDP and lets it
+    through unconditionally — an IPv6 enforcement bypass."""
+    nh = payload[6]
+    off = 40
+    for _ in range(16):                      # bound the walk (no infinite chains)
+        if nh in (_TCP, _UDP):
+            return nh, payload[off:]
+        if nh in _IP6_NO_L4:
+            return None, b""
+        if len(payload) < off + 2:           # need next-header + length bytes
+            return None, b""
+        nxt = payload[off]
+        if nh == _IP6_FRAGMENT:
+            frag_off = ((payload[off + 2] << 8) | payload[off + 3]) & 0xFFF8
+            off += 8
+            if frag_off != 0:                # later fragment carries no L4 header
+                return None, b""
+        elif nh == _IP6_AH:
+            off += (payload[off + 1] + 2) * 4
+        elif nh in _IP6_EXT_LEN8:
+            off += (payload[off + 1] + 1) * 8
+        else:                                # ICMPv6 or anything we don't enforce
+            return None, b""
+        nh = nxt
+    return None, b""
+
 
 def parse_packet(payload):
     """Extract a flow from a raw IPv4/IPv6 packet, or None."""
@@ -44,19 +84,25 @@ def parse_packet(payload):
     ver = payload[0] >> 4
     try:
         if ver == 4:
+            if len(payload) < 20:        # truncated header
+                return None
             ihl = (payload[0] & 0x0F) * 4
             proto = payload[9]
             src = socket.inet_ntop(socket.AF_INET, payload[12:16])
             dst = socket.inet_ntop(socket.AF_INET, payload[16:20])
             l4 = payload[ihl:]
         elif ver == 6:
-            proto = payload[6]
+            if len(payload) < 40:        # truncated header
+                return None
             src = socket.inet_ntop(socket.AF_INET6, payload[8:24])
             dst = socket.inet_ntop(socket.AF_INET6, payload[24:40])
-            l4 = payload[40:]
+            proto, l4 = _ipv6_upper(payload)
+            if proto is None:            # ext-header chain with no TCP/UDP
+                return None
         else:
             return None
-    except (OSError, IndexError):
+    except (OSError, IndexError, ValueError):
+        # ValueError: inet_ntop on a short slice from a truncated packet.
         return None
     if proto == _TCP:
         p = "tcp"
@@ -91,7 +137,7 @@ def is_root():
 
 class Engine:
     def __init__(self, config, rules, procmap, dnscache=None, integrity=None,
-                 on_prompt=None, on_event=None):
+                 on_prompt=None, on_event=None, can_prompt=None):
         self.config = config
         self.rules = rules
         self.procmap = procmap
@@ -99,6 +145,10 @@ class Engine:
         self.integrity = integrity
         self.on_prompt = on_prompt      # (prompt_id, flow) -> None
         self.on_event = on_event        # (flow, action, auto, rule_summary) -> None
+        # () -> bool: True if a prompt can actually reach someone who can
+        # answer it (a GUI client is connected). When it returns False we must
+        # NOT hold-and-deny — see the fail-open guard in _on_packet.
+        self.can_prompt = can_prompt
         self.running = False
         self._nfq = None
         self._thread = None
@@ -174,10 +224,21 @@ class Engine:
         self._nfq = NetfilterQueue()
         try:
             self._nfq.bind(int(self.config.get("enforce_nfqueue_num", 0)),
-                           self._on_packet)
+                           self._on_packet_safe)
         except OSError as exc:
             self._nft_teardown()
             return False, f"queue bind failed: {exc}"
+        # The kernel queue defaults to 1024 packets, but we can retain up to
+        # max_pending*max_per_group held connections awaiting decisions. If the
+        # queue overflows the kernel hard-drops new packets (and nft `bypass`
+        # does NOT help while we're still bound) — another path to a blackout.
+        # Size the queue to comfortably hold our worst case.
+        try:
+            cap = (int(self.config.get("enforce_max_pending", 30))
+                   * int(self.config.get("enforce_max_per_group", 200)))
+            self._nfq.set_queue_max_len(max(1024, cap + 1024))
+        except Exception:  # noqa: BLE001 — older lib without set_queue_max_len
+            pass
         self._stop_r, self._stop_w = socket.socketpair()
         self.running = True
         self._thread = threading.Thread(target=self._loop, daemon=True)
@@ -233,6 +294,21 @@ class Engine:
                     break
 
     # ---- per-packet -----------------------------------------------------
+    def _on_packet_safe(self, pkt):
+        """Crash barrier around the packet handler. An unhandled exception in
+        the NFQUEUE callback would kill the reader thread, leaving the queue
+        bound but unserviced — new connections then pile up and the kernel
+        drops them (a blackout that nft `bypass` can't prevent while we're
+        bound). So any handler error fails OPEN: accept the packet and carry
+        on, never strand the reader thread."""
+        try:
+            self._on_packet(pkt)
+        except Exception:  # noqa: BLE001 — availability over a single verdict
+            try:
+                pkt.accept()
+            except Exception:  # noqa: BLE001 — verdict may already be set
+                pass
+
     def _on_packet(self, pkt):
         payload = pkt.get_payload()
         flow = parse_packet(payload)
@@ -286,7 +362,8 @@ class Engine:
             flow["dst_host"] = self.dns.hostname(flow["dst_ip"]) or ""
         flow.setdefault("dst_host", "")
         if self.integrity and flow.get("process_path"):
-            flow["integrity"] = self.integrity.verify(flow["process_path"])
+            # Non-blocking: never hash a big ELF inline on the packet thread.
+            flow["integrity"] = self.integrity.verify_async(flow["process_path"])
 
         action, rule = self.rules.decide(flow)
         if action == rules_mod.ALLOW:
@@ -306,6 +383,16 @@ class Engine:
         if default == "deny":
             pkt.drop()
             self._event(flow, "deny", True, None)
+            return
+
+        # SAFETY: if nothing can answer a prompt (no GUI client connected),
+        # holding the packet means it gets default-denied at timeout — and on a
+        # headless boot that silently kills EVERY new connection (the daemon
+        # auto-arms enforcement on start). Fail open instead: accept and record
+        # it, so an unattended firewall can never strand the machine offline.
+        if self.can_prompt is not None and not self.can_prompt():
+            pkt.accept()
+            self._event(flow, "allow", True, None)
             return
 
         # prompt: HOLD the packet until the user (or timeout) decides. Group by

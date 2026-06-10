@@ -122,6 +122,10 @@ class GeoNetMonApp(Gtk.Application):
             if self.win.engine:
                 self.win.engine.stop()
             if getattr(self.win, "using_daemon", False):
+                # Quitting disarms the daemon firewall (full stop). No-ops if the
+                # window's own teardown already closed the socket.
+                self.win.daemon.on_disconnect = None
+                self.win.daemon.set_enforce(False)
                 self.win.daemon.close()
             self.win.rules.save()
             self.win.enricher.shutdown()

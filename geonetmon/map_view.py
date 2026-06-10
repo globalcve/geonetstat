@@ -70,6 +70,15 @@ def _split_antimeridian(pts, width):
 
 # ── WorldMap drawing area ──────────────────────────────────────────────────────
 
+# Packet-flow animation: how fast a "packet" traverses an arc (fraction of the
+# path per second) and which direction it travels. Outbound flows Home→peer;
+# inbound flows peer→Home; risky traffic moves faster to draw the eye.
+_FLOW_SPEED = {"out": 0.30, "in": 0.30, "foreign": 0.34, "risk": 0.55}
+_FLOW_REVERSE = {"in"}            # endpoint → Home
+_FLOW_PACKETS = 3                 # evenly spaced packets per arc
+_FLOW_TRAIL = 4                   # comet-trail dots behind each packet
+
+
 class WorldMap(Gtk.DrawingArea):
     def __init__(self):
         super().__init__()
@@ -83,7 +92,9 @@ class WorldMap(Gtk.DrawingArea):
         self._selected = None
         self._on_pick = None
         self._on_right_pick = None
+        self._now = 0.0              # wall-clock seconds, advanced by the frame clock
         self.set_draw_func(self._draw)
+        self.add_tick_callback(self._on_tick)
         click = Gtk.GestureClick()
         click.connect("pressed", self._on_click)
         self.add_controller(click)
@@ -134,6 +145,16 @@ class WorldMap(Gtk.DrawingArea):
     def set_theme_dark(self, dark):
         self._theme = "dark" if dark else "light"
         self.queue_draw()
+
+    def _on_tick(self, _widget, clock):
+        # Drive the packet animation off the monotonic frame clock so motion is
+        # wall-clock paced regardless of frame rate. Only redraw when there is
+        # something to animate (arcs need a Home + endpoints) so an idle map
+        # doesn't burn CPU repainting every frame.
+        self._now = clock.get_frame_time() / 1_000_000.0
+        if self._home and self._points:
+            self.queue_draw()
+        return GLib.SOURCE_CONTINUE
 
     def _colors(self):
         if self._theme == "dark":
@@ -201,6 +222,7 @@ class WorldMap(Gtk.DrawingArea):
                         else:
                             ctx.line_to(x, y)
                     ctx.stroke()
+                self._draw_flow(ctx, pts, width, height, c, p.get("kind", "out"))
                 self._dot(ctx, p, width, height, col)
 
             ctx.set_source_rgb(*col["home"])
@@ -212,6 +234,49 @@ class WorldMap(Gtk.DrawingArea):
         else:
             for p in self._points:
                 self._dot(ctx, p, width, height, col)
+
+    def _draw_flow(self, ctx, pts, width, height, color, kind):
+        """Animate glowing packets travelling along one arc's polyline.
+
+        ``pts`` runs Home→endpoint; outbound packets ride it forward, inbound
+        ones backward. Each packet trails a few fading dots (a comet). Segments
+        that wrap the antimeridian (a big horizontal jump) are skipped so a
+        packet never streaks across the whole map."""
+        n = len(pts)
+        if n < 2:
+            return
+        sp = [project(lon, lat, width, height) for (lon, lat) in pts]
+        speed = _FLOW_SPEED.get(kind, 0.30)
+        reverse = kind in _FLOW_REVERSE
+        base = self._now * speed
+        for i in range(_FLOW_PACKETS):
+            head = (base + i / _FLOW_PACKETS) % 1.0
+            for t_off in range(_FLOW_TRAIL):
+                t = head - t_off * 0.018
+                if t < 0.0:
+                    continue
+                tt = (1.0 - t) if reverse else t
+                pos = tt * (n - 1)
+                seg = min(int(pos), n - 2)
+                (x0, y0), (x1, y1) = sp[seg], sp[seg + 1]
+                frac = pos - seg
+                # Antimeridian: the great circle leaves one edge and re-enters
+                # the other. Unwrap the segment so the packet keeps moving the
+                # short way across the seam, then fold the result back onto the
+                # map — the packet flows visibly OVER the edge instead of
+                # popping out of existence.
+                dx = x1 - x0
+                if dx > width * 0.5:
+                    x1 -= width
+                elif dx < -width * 0.5:
+                    x1 += width
+                x = (x0 + (x1 - x0) * frac) % width
+                y = y0 + (y1 - y0) * frac
+                alpha = 0.9 * (1.0 - t_off / _FLOW_TRAIL)
+                r = 2.6 if t_off == 0 else max(1.0, 2.6 - t_off * 0.5)
+                ctx.set_source_rgba(*color, alpha)
+                ctx.arc(x, y, r, 0, 2 * math.pi)
+                ctx.fill()
 
     def _dot(self, ctx, p, width, height, col):
         c = col.get(p.get("kind", "out"), col["out"])

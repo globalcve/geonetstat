@@ -35,9 +35,10 @@
 .prompt-allow:hover { background-color: alpha(@gnm_enc_ok, 0.85); }
 .prompt-deny:hover  { background-color: alpha(@gnm_enc_bad, 0.85); }
 
-/* New connection flash */
+/* New connection flash — use the accent so it matches the chosen theme accent
+   (the old @gnm_new was a fixed cream that muddied to brown over a dark bg). */
 .newconn {
-    background-color: alpha(@gnm_new, 0.28);
+    background-color: alpha(@gnm_accent, 0.28);
     border-radius: 5px;
     padding-left: 4px;
     padding-right: 4px;

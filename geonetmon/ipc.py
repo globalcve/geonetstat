@@ -65,6 +65,11 @@ class MessageReader:
     A returned ``None`` sentinel is never yielded; malformed lines are skipped.
     """
 
+    # Legitimate control messages are tiny; cap the accumulator so a peer that
+    # never sends a newline can't grow it without bound and exhaust the
+    # (root) daemon's memory. On overflow we drop the buffered garbage.
+    MAX_BUF = 1 << 20  # 1 MiB
+
     def __init__(self):
         self._buf = bytearray()
 
@@ -72,6 +77,9 @@ class MessageReader:
         if not data:
             return
         self._buf.extend(data)
+        if len(self._buf) > self.MAX_BUF and self._buf.find(b"\n") < 0:
+            del self._buf[:]            # no frame in sight — discard the flood
+            return
         while True:
             nl = self._buf.find(b"\n")
             if nl < 0:

@@ -197,7 +197,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.btn_privacy.connect("toggled", self._on_privacy_toggled)
         hb.pack_start(self.btn_privacy)
 
-        btn_cols = Gtk.Button(icon_name="view-column-symbolic")
+        btn_cols = Gtk.Button(icon_name="view-list-symbolic")
         btn_cols.set_tooltip_text("Show / hide columns")
         btn_cols.connect("clicked", self._show_cols_popover)
         hb.pack_end(btn_cols)
@@ -220,7 +220,7 @@ class MainWindow(Gtk.ApplicationWindow):
         menu.append("Clear alert log", "win.clearalerts")
         menu.append("About GeoNetMon", "win.about")
         menu.append("Quit", "app.quit")
-        btn_menu = Gtk.MenuButton(icon_name="open-menu-symbolic")
+        btn_menu = Gtk.MenuButton(icon_name="emblem-system-symbolic")
         btn_menu.set_menu_model(menu)
         hb.pack_end(btn_menu)
 
@@ -1496,6 +1496,11 @@ class MainWindow(Gtk.ApplicationWindow):
             self.engine.stop()
         if self.using_daemon:
             self.daemon.on_disconnect = None  # don't show "disconnected" dialog on intentional exit
+            # Closing the app means "stop, full stop": disarm the daemon's
+            # firewall so enforcement never lingers in the background and won't
+            # auto-arm on the next boot. Sent before close — the stream delivers
+            # it in order ahead of EOF, so the daemon tears down nft first.
+            self.daemon.set_enforce(False)
             self.daemon.close()
         self.rules.save()
         self.blocklists.save()

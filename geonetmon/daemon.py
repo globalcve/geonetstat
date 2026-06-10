@@ -35,7 +35,7 @@ import time
 
 from . import collector
 from . import ipc
-from .config import Config
+from .config import Config, DEFAULTS as cfg_defaults
 from .rules import Rules
 from .procmap import ProcMap
 from .dnscap import DNSCache
@@ -55,6 +55,7 @@ class Daemon:
         self.engine = Engine(
             self.config, self.rules, self.procmap, self.dns, self.integrity,
             on_prompt=self._on_prompt, on_event=self._on_event,
+            can_prompt=self._has_clients,
         )
         self.sock_path = socket_path or ipc.default_socket_path()
         self._server = None
@@ -63,6 +64,11 @@ class Daemon:
         self._running = False
 
     # ---- client registry ------------------------------------------------
+    def _has_clients(self):
+        """True if a GUI client is connected and can answer a prompt."""
+        with self._clients_lock:
+            return bool(self._clients)
+
     def _broadcast(self, msg):
         dead = []
         with self._clients_lock:
@@ -156,10 +162,14 @@ class Daemon:
             return {"type": "ok", "op": "unblock_ip"}
         if mtype == "set_config":
             key, val = msg.get("key"), msg.get("value")
-            if key in self.config:
+            # Type-check against the known default (load() does the same). A
+            # client poisoning e.g. enforce_prompt_timeout_s with a string would
+            # otherwise crash int() on the packet path and kill enforcement.
+            if key in cfg_defaults and isinstance(val, type(cfg_defaults[key])):
                 self.config[key] = val
                 self.config.save()
-            return {"type": "ok", "op": "set_config"}
+                return {"type": "ok", "op": "set_config"}
+            return {"type": "error", "op": "set_config", "error": "bad key/type"}
         return {"type": "error", "error": f"unknown type {mtype!r}"}
 
     def _serve_client(self, sock):

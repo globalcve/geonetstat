@@ -80,11 +80,19 @@ class Rule:
             return False
         if self.dst_port and int(flow.get("dst_port") or 0) != int(self.dst_port):
             return False
-        if self.process and _basename(flow.get("process")) != self.process:
-            return False
-        if (self.process_path and flow.get("process_path")
-                and flow.get("process_path") != self.process_path):
-            return False
+        # App identity is the EXECUTABLE, not the comm name. An app's child
+        # processes share one exe path but carry different /proc/comm names
+        # (e.g. Firefox's "Socket Process", "Isolated Web Co", GPU/RDD procs),
+        # and most connections originate in those children — so a rule keyed on
+        # comm would re-prompt and "any connection from <app>" wouldn't hold.
+        # When the rule pins a path, match strictly on the path (covers the
+        # whole app); fall back to the comm name only when there is no path.
+        if self.process_path:
+            if flow.get("process_path") != self.process_path:
+                return False
+        elif self.process:
+            if _basename(flow.get("process")) != self.process:
+                return False
         if self.dst_host:
             host = (flow.get("dst_host") or "").lower()
             want = self.dst_host.lower()

@@ -242,11 +242,17 @@ switch {
     background-image: none;
     border: none;
     box-shadow: none;
+    /* Pin the pill shape ourselves: without an explicit radius the trough
+       inherits the desktop theme's, and the square bounding-box corners of our
+       painted background reveal the light default underneath (the white
+       "bleed" at the corners of the coloured pill). */
+    border-radius: 9999px;
     min-width: 46px; min-height: 24px;
 }
 switch:checked {
     background-color: @gnm_accent;
     background-image: none;
+    border-radius: 9999px;
 }
 switch slider {
     background-color: @gnm_fg;
