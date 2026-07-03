@@ -92,6 +92,7 @@ class Enricher:
             tmp = self._cache_path + ".tmp"
             with open(tmp, "w", encoding="utf-8") as fh:
                 json.dump(self.cache, fh)
+            os.chmod(tmp, 0o600)    # visited-IP history — owner-only
             os.replace(tmp, self._cache_path)
         except OSError:
             pass
@@ -256,10 +257,13 @@ class Enricher:
 
     @staticmethod
     def _rdns(ip):
+        # "" (not "Unknown") on failure: many CDN/cloud IPs — especially the
+        # ones behind HTTPS on 443 — publish no PTR record at all, and the
+        # display layer wants to fall back to other hostname sources.
         try:
             return socket.gethostbyaddr(ip)[0]
         except (OSError, socket.herror, socket.gaierror):
-            return "Unknown"
+            return ""
 
     def shutdown(self):
         self.save_cache()

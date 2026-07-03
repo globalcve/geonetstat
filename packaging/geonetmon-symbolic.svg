@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- Monochrome panel/tray icon (GNOME symbolic convention: the shell
+       recolors it to match the top bar). Same network-hub motif as the
+       coloured app icon. NOTE: no XML declaration or comment may appear
+       BEFORE the <svg> element — Ubuntu 26.04's glycin gdk-pixbuf loader
+       sniffs the leading bytes for "<svg" and otherwise rejects the file,
+       which made the tray fall back to a "..." placeholder. -->
+  <g fill="none" stroke="#bebebe" stroke-width="1.1" stroke-linecap="round">
+    <line x1="5.74" y1="6.03" x2="3.2" y2="3.8"/>
+    <line x1="10.17" y1="5.92" x2="12.8" y2="3.4"/>
+    <line x1="10.39" y1="9.82" x2="13" y2="11.8"/>
+    <line x1="5.88" y1="10.12" x2="3.4" y2="12.6"/>
+  </g>
+  <g fill="#bebebe">
+    <circle cx="3.2" cy="3.8" r="1.7"/>
+    <circle cx="12.8" cy="3.4" r="1.7"/>
+    <circle cx="13" cy="11.8" r="1.7"/>
+    <circle cx="3.4" cy="12.6" r="1.7"/>
+    <path fill-rule="evenodd" d="M 8,5.1 A 2.9,2.9 0 1 0 8,10.9
+      A 2.9,2.9 0 1 0 8,5.1 Z
+      M 8,6.9 A 1.1,1.1 0 1 1 8,9.1 A 1.1,1.1 0 1 1 8,6.9 Z"/>
+  </g>
+</svg>

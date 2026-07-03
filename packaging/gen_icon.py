@@ -56,14 +56,30 @@ out = sys.argv[1] if len(sys.argv) > 1 else "geonetmon.png"
 
 
 def _render(svg_bytes, dest):
-    """Rasterize the SVG to a 256x256 PNG. Prefer cairosvg; fall back to any
-    SVG rasterizer on the system so the build doesn't hard-depend on Pillow."""
+    """Rasterize the SVG to a 256x256 PNG. Prefer cairosvg; fall back to
+    librsvg via GObject introspection (present wherever the GTK4 stack is,
+    so the build works with no extra packages), then to any CLI rasterizer."""
     try:
         import cairosvg
         cairosvg.svg2png(bytestring=svg_bytes, write_to=dest,
                          output_width=256, output_height=256)
         return
     except ImportError:
+        pass
+    try:
+        import gi
+        gi.require_version("Rsvg", "2.0")
+        from gi.repository import Rsvg
+        import cairo
+        handle = Rsvg.Handle.new_from_data(svg_bytes)
+        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 256, 256)
+        viewport = Rsvg.Rectangle()
+        viewport.x, viewport.y = 0, 0
+        viewport.width, viewport.height = 256, 256
+        handle.render_document(cairo.Context(surface), viewport)
+        surface.write_to_png(dest)
+        return
+    except (ImportError, ValueError):
         pass
     with tempfile.NamedTemporaryFile("wb", suffix=".svg", delete=False) as fh:
         fh.write(svg_bytes)

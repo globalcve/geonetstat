@@ -76,6 +76,8 @@ class ConnectionObject(GObject.Object):
     lng = GObject.Property(type=GObject.TYPE_DOUBLE, default=0.0)
     has_geo = GObject.Property(type=bool, default=False)
     verdict = GObject.Property(type=str, default="")   # "allow"/"deny" from firewall
+    dns_name = GObject.Property(type=str, default="")  # name the app resolved (DNS capture)
+    dup_count = GObject.Property(type=int, default=0)  # >1: group leader in past view
 
     def __init__(self, conn):
         super().__init__()
@@ -89,6 +91,8 @@ class ConnectionObject(GObject.Object):
         self.first_seen = time.time()
         self.last_seen = self.first_seen
         self.enriched = False
+        self.ptr = ""            # actual PTR record ("" = none published)
+        self.geo_hostname = ""   # hostname reported by the geo provider
         self._prev_sent = conn.bytes_sent
         self._prev_recv = conn.bytes_recv
         self._prev_ts = self.first_seen
@@ -103,11 +107,19 @@ class ConnectionObject(GObject.Object):
         self.set_property("proto", conn.proto)
         self.set_property("state", conn.state)
         self.set_property("direction", conn.direction)
-        self.set_property("application", conn.app or "Unknown")
+        # Keep the last known process: once a socket enters TIME-WAIT/closing
+        # the kernel owns it and attribution comes back empty — stomping
+        # "firefox" with "Unknown" would throw away what we already knew.
+        new_app = (conn.app or "").strip()
+        if new_app and new_app != "Unknown":
+            self.set_property("application", new_app)
+        elif not self.application:
+            self.set_property("application", "Unknown")
         self.set_property("port", conn.service_port)
         self.set_property("service", conn.service or "Ephemeral/Unknown")
         self.set_property("encryption", conn.encryption)
-        self.set_property("pid", conn.pid)
+        if conn.pid:                       # same: don't forget a known PID
+            self.set_property("pid", conn.pid)
         self._update_rates(conn)
         self.last_seen = time.time()
 
@@ -154,13 +166,30 @@ class ConnectionObject(GObject.Object):
 
     def apply_enrichment(self, data, home_country):
         """data: dict with org/city/country/rdns from the Enricher."""
+        ptr = data.get("rdns") or ""
+        if ptr == "Unknown":          # legacy cache entries stored the label
+            ptr = ""
+        self.ptr = ptr
+        self.geo_hostname = data.get("hostname") or ""
+
+        # Best hostname we know: real PTR, else the geo provider's hostname,
+        # else the name the app actually resolved (captured DNS). Many 443/CDN
+        # IPs have no PTR at all, which used to render as a bare "Unknown".
+        self.set_property(
+            "rdns", ptr or self.geo_hostname or self.dns_name or "")
+
+        # Non-public endpoints get no geo/org from the enricher — keep the
+        # labels from _init_local_labels ("Loopback", "Private network", …)
+        # instead of stomping them with "Unknown".
+        kind = data.get("kind") or ""
+        if kind and kind != "public":
+            self.enriched = True
+            return
+
         org = data.get("org") or "Unknown"
         city = data.get("city") or ""
         cc = (data.get("country") or "").upper()
-        rdns = data.get("rdns") or "Unknown"
-
         self.set_property("org", org)
-        self.set_property("rdns", rdns)
         self.set_property("country", cc)
 
         if cc:
@@ -185,8 +214,17 @@ class ConnectionObject(GObject.Object):
                 pass
         self.enriched = True
 
+    def set_dns_name(self, name):
+        """Record the hostname the app resolved (from DNS capture); use it as
+        the displayed hostname when the IP has no PTR record."""
+        if not name or name == self.dns_name:
+            return
+        self.set_property("dns_name", name)
+        if not self.ptr and not self.geo_hostname:
+            self.set_property("rdns", name)
+
     def search_blob(self):
         return " ".join((
-            self.ip, self.org, self.location, self.rdns,
+            self.ip, self.org, self.location, self.rdns, self.dns_name,
             self.application, self.service, self.proto, str(self.port),
         )).lower()

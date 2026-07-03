@@ -3,7 +3,8 @@
 Each palette defines the semantic ``gnm_*`` tokens that style.css references.
 Themes other than ``system`` also recolour the main window chrome (window,
 headerbar, column view, status bar, entries, popovers) so the app reads as a
-cohesive Dracula / Catppuccin surface without depending on libadwaita.
+cohesive themed surface (Dracula, Catppuccin, and the palettes ported from
+Tesseract) without depending on libadwaita.
 
 ``system`` supplies only the accent tokens and leaves window chrome to the
 user's existing GTK theme (respecting their light/dark preference).
@@ -12,6 +13,8 @@ user's existing GTK theme (respecting their light/dark preference).
 import os
 
 # Ordered for the preferences drop-down. (id, human label)
+# The block after Catppuccin is ported from Tesseract's theme set
+# (vintage / cyberpunk / Gogh-derived terminal palettes).
 THEME_CHOICES = [
     ("system", "System (follow desktop)"),
     ("dracula", "Dracula"),
@@ -19,6 +22,20 @@ THEME_CHOICES = [
     ("catppuccin-frappe", "Catppuccin Frapp\u00e9"),
     ("catppuccin-macchiato", "Catppuccin Macchiato"),
     ("catppuccin-mocha", "Catppuccin Mocha"),
+    ("adventure-time", "Adventure Time"),
+    ("borland", "Borland"),
+    ("c64", "Commodore 64"),
+    ("fairy-floss-dark", "Fairy Floss Dark"),
+    ("flat", "Flat"),
+    ("gogh", "Gogh \u2014 Starry Night"),
+    ("grass", "Grass"),
+    ("gruvbox-material", "Gruvbox Material"),
+    ("homebrew", "Homebrew"),
+    ("kokuban", "Kokuban"),
+    ("mono-cyan", "Mono Cyan"),
+    ("neon-tessera", "Neon Tessera"),
+    ("ocean", "Ocean"),
+    ("vintage-light", "Vintage Light"),
 ]
 
 _THEME_IDS = [tid for tid, _ in THEME_CHOICES]
@@ -66,6 +83,93 @@ _ACCENTS = {
         "enc_ok": "#a6e3a1", "enc_bad": "#f38ba8", "warn": "#f9e2af",
         "accent": "#89dceb",
     },
+    # --- ported from Tesseract (accents derived from each palette's
+    #     ok/warn/err/accent/accent2 roles; a few tones lightened where the
+    #     source colour was unreadable on the window background) ---
+    "adventure-time": {
+        "new": "#e7b000", "foreign": "#e7741e",
+        "dir_in": "#e7741e", "dir_out": "#5cf9ff", "listen": "#a39ac4",
+        "enc_ok": "#4ab118", "enc_bad": "#ff4b58", "warn": "#e7b000",
+        "accent": "#e7741e",
+    },
+    "borland": {
+        "new": "#ffff4e", "foreign": "#ff5959",
+        "dir_in": "#ffff4e", "dir_out": "#4fe9fc", "listen": "#b6b6e6",
+        "enc_ok": "#4efa78", "enc_bad": "#ff5959", "warn": "#ffff4e",
+        "accent": "#ffff4e",
+    },
+    "c64": {
+        "new": "#bfce72", "foreign": "#e09952",
+        "dir_in": "#e09952", "dir_out": "#67b6bd", "listen": "#9385c9",
+        "enc_ok": "#6fca63", "enc_bad": "#c05a4e", "warn": "#bfce72",
+        "accent": "#bfce72",
+    },
+    "fairy-floss-dark": {
+        "new": "#ffea00", "foreign": "#ff857f",
+        "dir_in": "#ffea00", "dir_out": "#c5a3ff", "listen": "#ffb8d1",
+        "enc_ok": "#c2ffdf", "enc_bad": "#ff857f", "warn": "#ffea00",
+        "accent": "#ffb8d1",
+    },
+    "flat": {
+        "new": "#f1c40f", "foreign": "#e67e22",
+        "dir_in": "#e67e22", "dir_out": "#3498db", "listen": "#9b59b6",
+        "enc_ok": "#2ecc71", "enc_bad": "#e74c3c", "warn": "#f1c40f",
+        "accent": "#3498db",
+    },
+    "gogh": {
+        "new": "#f4cd3a", "foreign": "#d9603b",
+        "dir_in": "#d9603b", "dir_out": "#5b8dd9", "listen": "#94a8cc",
+        "enc_ok": "#6bbf59", "enc_bad": "#d9603b", "warn": "#f4cd3a",
+        "accent": "#f4cd3a",
+    },
+    "grass": {
+        "new": "#e7b000", "foreign": "#e05545",
+        "dir_in": "#e7b000", "dir_out": "#7fd9b0", "listen": "#bcd6a0",
+        "enc_ok": "#9bea6a", "enc_bad": "#e05545", "warn": "#e7b000",
+        "accent": "#e7b000",
+    },
+    "gruvbox-material": {
+        "new": "#d8a657", "foreign": "#e78a4e",
+        "dir_in": "#e78a4e", "dir_out": "#7daea3", "listen": "#d3869b",
+        "enc_ok": "#a9b665", "enc_bad": "#ea6962", "warn": "#d8a657",
+        "accent": "#d8a657",
+    },
+    "homebrew": {
+        "new": "#d0d000", "foreign": "#e0a000",
+        "dir_in": "#e0a000", "dir_out": "#00d8b2", "listen": "#1f8a1f",
+        "enc_ok": "#00c800", "enc_bad": "#ff4040", "warn": "#d0d000",
+        "accent": "#00ff00",
+    },
+    "kokuban": {
+        "new": "#f0e68c", "foreign": "#f2b4b4",
+        "dir_in": "#f0e68c", "dir_out": "#a9c2af", "listen": "#d8c8f0",
+        "enc_ok": "#a8d8a0", "enc_bad": "#f2a0a0", "warn": "#f0e68c",
+        "accent": "#f2e9c8",
+    },
+    "mono-cyan": {
+        "new": "#80e0e0", "foreign": "#e08585",
+        "dir_in": "#80e0e0", "dir_out": "#5ce0e0", "listen": "#5c9a9a",
+        "enc_ok": "#00d0a0", "enc_bad": "#e08585", "warn": "#80e0e0",
+        "accent": "#00d0d0",
+    },
+    "neon-tessera": {
+        "new": "#ffc400", "foreign": "#ff2ec4",
+        "dir_in": "#ffc400", "dir_out": "#00e5ff", "listen": "#ff2ec4",
+        "enc_ok": "#00ff9c", "enc_bad": "#ff3860", "warn": "#ffc400",
+        "accent": "#00e5ff",
+    },
+    "ocean": {
+        "new": "#ebcb8b", "foreign": "#d08770",
+        "dir_in": "#d08770", "dir_out": "#8fa1b3", "listen": "#b48ead",
+        "enc_ok": "#a3be8c", "enc_bad": "#bf616a", "warn": "#ebcb8b",
+        "accent": "#8fa1b3",
+    },
+    "vintage-light": {
+        "new": "#b07d3a", "foreign": "#a14d3a",
+        "dir_in": "#b07d3a", "dir_out": "#4f7c74", "listen": "#7a6a55",
+        "enc_ok": "#5f7d4f", "enc_bad": "#a14d3a", "warn": "#b07d3a",
+        "accent": "#b07d3a",
+    },
 }
 
 # Window-chrome palettes for the non-system themes.
@@ -90,6 +194,63 @@ _CHROME = {
     "catppuccin-mocha": {
         "bg": "#1e1e2e", "fg": "#cdd6f4", "bg_alt": "#181825",
         "sel": "#313244", "border": "#11111b",
+    },
+    # --- ported from Tesseract (bg=window, bg_alt=headerbar, sel=raised) ---
+    "adventure-time": {
+        "bg": "#1f1d45", "fg": "#f8dcc0", "bg_alt": "#17152f",
+        "sel": "#34306a", "border": "#3a356f",
+    },
+    "borland": {
+        "bg": "#0000a4", "fg": "#ffff80", "bg_alt": "#000084",
+        "sel": "#1730c0", "border": "#2a40c4",
+    },
+    "c64": {
+        "bg": "#40318d", "fg": "#cabdf2", "bg_alt": "#352978",
+        "sel": "#5a4bb0", "border": "#5648a8",
+    },
+    "fairy-floss-dark": {
+        "bg": "#3b364c", "fg": "#f8f8f2", "bg_alt": "#332f42",
+        "sel": "#56506f", "border": "#564f6f",
+    },
+    "flat": {
+        "bg": "#2c3e50", "fg": "#ecf0f1", "bg_alt": "#243342",
+        "sel": "#3e5870", "border": "#3e5066",
+    },
+    "gogh": {
+        "bg": "#0d1b34", "fg": "#e8eeff", "bg_alt": "#0a1628",
+        "sel": "#1b3260", "border": "#21345f",
+    },
+    "grass": {
+        "bg": "#13773d", "fg": "#fff0a5", "bg_alt": "#0f6234",
+        "sel": "#239a55", "border": "#2a9a5e",
+    },
+    "gruvbox-material": {
+        "bg": "#282828", "fg": "#d4be98", "bg_alt": "#1f1f1f",
+        "sel": "#3c3836", "border": "#45403d",
+    },
+    "homebrew": {
+        "bg": "#000000", "fg": "#00d000", "bg_alt": "#050505",
+        "sel": "#122012", "border": "#103810",
+    },
+    "kokuban": {
+        "bg": "#1f3526", "fg": "#f0f0e8", "bg_alt": "#192c1f",
+        "sel": "#2f4c39", "border": "#315040",
+    },
+    "mono-cyan": {
+        "bg": "#081414", "fg": "#c8f0f0", "bg_alt": "#040e0e",
+        "sel": "#143030", "border": "#163838",
+    },
+    "neon-tessera": {
+        "bg": "#0a0e14", "fg": "#d8e6f2", "bg_alt": "#070a10",
+        "sel": "#161d29", "border": "#1d2735",
+    },
+    "ocean": {
+        "bg": "#2b303b", "fg": "#c0c5ce", "bg_alt": "#232831",
+        "sel": "#3e4855", "border": "#3e4855",
+    },
+    "vintage-light": {
+        "bg": "#f6efe1", "fg": "#46392b", "bg_alt": "#efe5d0",
+        "sel": "#e7dabf", "border": "#d8c8a8",
     },
 }
 
@@ -201,12 +362,28 @@ scrolledwindow, viewport, .view, treeview, listview { background-color: @gnm_bg;
 
 /* Plain buttons (dialog Close/Clear/Add, etc.) — give them a themed surface so
    they don't fall back to the light desktop theme and render white. More
-   specific rules (.suggested-action, .prompt-allow, headerbar button, .tl) win. */
+   specific rules (.suggested-action, .prompt-allow, headerbar button, .tl) win.
+   Pin the radius like `switch` below: without it the desktop theme's radius
+   clips our painted background and its light default bleeds through at the
+   corners. */
 button {
     background-color: @gnm_bg_alt; background-image: none;
     color: @gnm_fg; border: 1px solid @gnm_border;
+    border-radius: 6px; box-shadow: none;
 }
 button:hover { background-color: @gnm_sel; }
+/* Toggle buttons: the desktop theme paints :checked with its own
+   background-image/gradient which bled through our flat colours — clear it
+   explicitly and give checked toggles the accent everywhere (body toggles
+   previously had NO checked style at all and stayed stock-white). */
+button:checked, button.toggle:checked {
+    background-color: @gnm_accent; background-image: none;
+    color: @gnm_bg; border-color: transparent;
+    border-radius: 6px; box-shadow: none;
+}
+button:checked:hover, button.toggle:checked:hover {
+    background-color: alpha(@gnm_accent, 0.85);
+}
 button:disabled { color: alpha(@gnm_fg, 0.4); }
 
 /* Popover menus (the hamburger menu / context menus) and their items. */
@@ -224,7 +401,9 @@ button.suggested-action, button.default {
 }
 button.suggested-action:hover, button.default:hover { background-color: alpha(@gnm_accent, 0.85); }
 headerbar button:checked, headerbar togglebutton:checked,
-.titlebar button:checked { background-color: @gnm_accent; color: @gnm_bg; }
+.titlebar button:checked {
+    background-color: @gnm_accent; background-image: none;
+    color: @gnm_bg; border-radius: 6px; box-shadow: none; }
 /* Shield active: colour the icon only — no filled box.
    Alert button unread: same — just recolour the icon, no background. */
 headerbar button.toggle.enforcing {
@@ -300,13 +479,14 @@ ACCENT_PALETTE = {
 }
 ACCENT_CHOICES = ["Theme default"] + list(ACCENT_PALETTE)
 
-_DARK_THEMES = ("dracula", "catppuccin-frappe", "catppuccin-macchiato",
-                "catppuccin-mocha")
+# Every themed palette is dark except these; 'system' follows the desktop.
+_LIGHT_THEMES = ("catppuccin-latte", "vintage-light")
 
 
 def is_dark(theme):
     """True if the theme is a dark one (so GTK should prefer its dark variant)."""
-    return normalize(theme) in _DARK_THEMES
+    theme = normalize(theme)
+    return theme in _CHROME and theme not in _LIGHT_THEMES
 
 
 def build_css(theme, accent=""):

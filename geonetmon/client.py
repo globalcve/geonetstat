@@ -18,12 +18,14 @@ from . import ipc
 
 class DaemonClient:
     def __init__(self, on_prompt=None, on_event=None, on_status=None,
-                 on_rules=None, on_disconnect=None, socket_path=None):
+                 on_rules=None, on_disconnect=None, on_dns=None,
+                 socket_path=None):
         self.on_prompt = on_prompt
         self.on_event = on_event
         self.on_status = on_status
         self.on_rules = on_rules
         self.on_disconnect = on_disconnect
+        self.on_dns = on_dns
         self.sock_path = socket_path or ipc.default_socket_path()
         self._sock = None
         self._thread = None
@@ -72,6 +74,8 @@ class DaemonClient:
             self.on_status(msg)
         elif t == "rules" and self.on_rules:
             self.on_rules(msg.get("rules", []))
+        elif t == "dns" and self.on_dns:
+            self.on_dns(msg.get("map", {}))
         return False
 
     # ---- commands -------------------------------------------------------
@@ -93,6 +97,12 @@ class DaemonClient:
 
     def get_status(self):
         self.send({"type": "get_status"})
+
+    def get_dns(self):
+        self.send({"type": "get_dns"})
+
+    def set_config(self, key, value):
+        self.send({"type": "set_config", "key": key, "value": value})
 
     def add_rule(self, flow, action, scope, scope_by):
         self.send({"type": "add_rule", "flow": flow, "action": action,

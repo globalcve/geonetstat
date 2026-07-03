@@ -8,7 +8,7 @@
 #
 set -euo pipefail
 
-BASE_VERSION="1.0.2"
+BASE_VERSION="1.0.3"
 # Unique, monotonically-increasing version per build. dpkg/apt compare VERSION
 # strings, so without this an "install" over the same 1.0.0 is a silent no-op
 # (old code keeps running). The +buildTIMESTAMP suffix forces a real upgrade.
@@ -26,6 +26,7 @@ mkdir -p \
   "$STAGE/usr/bin" \
   "$STAGE/usr/share/applications" \
   "$STAGE/usr/share/icons/hicolor/256x256/apps" \
+  "$STAGE/usr/share/icons/hicolor/symbolic/apps" \
   "$STAGE/usr/lib/systemd/system"
 
 echo "==> Copying the Python package"
@@ -59,6 +60,9 @@ StartupWMClass=com.jegly.GeoNetMon
 EOF
 python3 "$HERE/packaging/gen_icon.py" \
   "$STAGE/usr/share/icons/hicolor/256x256/apps/geonetmon.png"
+# Monochrome panel icon — the shell recolors *-symbolic to match the top bar.
+install -Dm644 "$HERE/packaging/geonetmon-symbolic.svg" \
+  "$STAGE/usr/share/icons/hicolor/symbolic/apps/geonetmon-symbolic.svg"
 
 echo "==> systemd service"
 install -Dm644 "$HERE/packaging/geonetmond.service" \

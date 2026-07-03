@@ -13,6 +13,7 @@ Protocol (GUI -> daemon):
   {"type":"hello"}                              -> {"type":"welcome", ...}
   {"type":"get_rules"}                          -> {"type":"rules", "rules":[...]}
   {"type":"get_status"}                         -> {"type":"status", ...}
+  {"type":"get_dns"}                            -> {"type":"dns", "map":{ip:host}}
   {"type":"set_enforce","on":bool}              -> status
   {"type":"decide","prompt_id":..,"action":"allow|deny",
                     "scope":"once|session|forever|no_rule",
@@ -39,6 +40,7 @@ from .config import Config, DEFAULTS as cfg_defaults
 from .rules import Rules
 from .procmap import ProcMap
 from .dnscap import DNSCache
+from .dnssniff import DNSSniffer
 from .integrity import Integrity
 from .netfilter import Engine
 from . import firewall as fw_mod
@@ -50,6 +52,9 @@ class Daemon:
         self.rules = Rules(self.config)
         self.procmap = ProcMap()
         self.dns = DNSCache()
+        # Passive sniffer feeds the same cache the enforcement engine uses, so
+        # hostnames are known even in monitor-only mode (shield off).
+        self.sniffer = DNSSniffer(self.dns)
         self.integrity = Integrity()
         self.firewall = fw_mod.Firewall(self.config)
         self.engine = Engine(
@@ -120,6 +125,8 @@ class Daemon:
             return self._status()
         if mtype == "get_rules":
             return self._rules_msg()
+        if mtype == "get_dns":
+            return {"type": "dns", "map": self.dns.snapshot()}
         if mtype == "set_enforce":
             if msg.get("on"):
                 ok, info = self.engine.start()
@@ -168,6 +175,11 @@ class Daemon:
             if key in cfg_defaults and isinstance(val, type(cfg_defaults[key])):
                 self.config[key] = val
                 self.config.save()
+                if key == "dns_sniff":       # live toggle for the sniffer
+                    if val:
+                        self.sniffer.start()
+                    else:
+                        self.sniffer.stop()
                 return {"type": "ok", "op": "set_config"}
             return {"type": "error", "op": "set_config", "error": "bad key/type"}
         return {"type": "error", "error": f"unknown type {mtype!r}"}
@@ -232,6 +244,10 @@ class Daemon:
         if self.config.get("enforce_enabled"):
             ok, info = self.engine.start()
             print(f"[geonetmond] enforcement: {info}")
+        if self.config.get("dns_sniff", True):
+            on = self.sniffer.start()
+            print("[geonetmond] passive DNS capture: "
+                  + ("on" if on else "unavailable"))
         self._server = self._make_socket()
         # Publish process attribution for the unprivileged GUI (so it never
         # needs root just to see process names). Runs as root here, writes a
@@ -275,6 +291,7 @@ class Daemon:
                 os.unlink(collector.DAEMON_PROC_FILE)
         except OSError:
             pass
+        self.sniffer.stop()
         self.engine.stop()
         self.rules.save()
         self.integrity.save()

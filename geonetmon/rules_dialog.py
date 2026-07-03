@@ -11,6 +11,8 @@ import os
 
 from gi.repository import Gtk, Gio
 
+from .ui import escape_closes
+
 _SCOPE_NOTE = {
     "forever": "",
     "session": " · until restart",
@@ -23,6 +25,7 @@ class RulesWindow(Gtk.Window):
     def __init__(self, parent, rule_dicts, daemon=None, local_rules=None):
         super().__init__(title="Firewall rules", transient_for=parent)
         self.set_default_size(640, 520)
+        escape_closes(self)
         self.daemon = daemon            # DaemonClient or None
         self.local_rules = local_rules  # Rules or None (in-process mode)
         self._rules = list(rule_dicts or [])
@@ -102,14 +105,17 @@ class RulesWindow(Gtk.Window):
         sw.connect("state-set", self._toggle, rid)
         line.append(sw)
 
-        text = Gtk.Label(xalign=0, hexpand=True, wrap=True)
-        color = "#a6e3a1" if action == "allow" else "#f38ba8"
         scope_note = _SCOPE_NOTE.get(d.get("scope"), "")
         summary = d.get("summary") or ""
-        # the daemon's summary starts with the ACTION; show that as a coloured chip
+        # the daemon's summary starts with the ACTION; show that as a coloured
+        # chip. Colour via the theme's enc-ok/enc-bad classes (a hardcoded
+        # pastel was invisible on the light themes).
         rest = summary.split("  ", 1)[-1] if "  " in summary else summary
+        chip = Gtk.Label(label=action.upper(), xalign=0, valign=Gtk.Align.CENTER)
+        chip.add_css_class("enc-ok" if action == "allow" else "enc-bad")
+        line.append(chip)
+        text = Gtk.Label(xalign=0, hexpand=True, wrap=True)
         text.set_markup(
-            f"<span foreground='{color}'><b>{action.upper()}</b></span>  "
             f"{_esc(rest)}"
             f"<span alpha='55%'>{_esc(scope_note)} · {d.get('hits', 0)} hits</span>"
         )
@@ -171,6 +177,7 @@ class RulesWindow(Gtk.Window):
         dlg = Gtk.Window(title="Add firewall rule", transient_for=self,
                          modal=True)
         dlg.set_default_size(460, 0)
+        escape_closes(dlg)
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         for m in ("top", "bottom", "start", "end"):
             getattr(box, f"set_margin_{m}")(16)

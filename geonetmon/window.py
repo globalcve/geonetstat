@@ -1,6 +1,7 @@
 """Main application window: the live connection table and all controls."""
 
 import csv
+import ipaddress
 import time
 from collections import deque
 
@@ -34,11 +35,15 @@ _CLOSING_STATES = {
 
 
 # --- per-column renderers: each returns (text, [css_classes]) -------------
-def _r_ip(o):       return o.ip, ["mono"]
+def _r_ip(o):
+    # Past-view group leaders carry a repeat count ("×12").
+    if o.dup_count > 1:
+        return f"{o.ip}  ×{o.dup_count}", ["mono"]
+    return o.ip, ["mono"]
 def _r_proto(o):    return o.proto.upper(), []
 def _r_org(o):      return o.org, []
 def _r_loc(o):      return o.location, (["foreign"] if o.is_foreign else [])
-def _r_rdns(o):     return o.rdns, ["mono", "dim-label"]
+def _r_rdns(o):     return (o.rdns or "—"), ["mono", "dim-label"]
 def _r_app(o):      return o.application, ["bold"]
 def _r_port(o):     return (str(o.port) if o.port else ""), ["mono"]
 def _r_service(o):  return o.service, []
@@ -81,7 +86,10 @@ class MainWindow(Gtk.ApplicationWindow):
     def __init__(self, app, config):
         super().__init__(application=app, title="GeoNetMon")
         self.config = config
-        self.set_default_size(1280, 760)
+        self.set_default_size(config.get("win_width") or 1280,
+                              config.get("win_height") or 760)
+        if config.get("win_maximized"):
+            self.maximize()
 
         self.objs = {}                 # key -> ConnectionObject
         self._past_objs = {}           # key -> ConnectionObject (closed connections)
@@ -108,11 +116,13 @@ class MainWindow(Gtk.ApplicationWindow):
             on_status=self._on_daemon_status,
             on_rules=self._on_daemon_rules,
             on_disconnect=self._on_daemon_disconnect,
+            on_dns=self._on_daemon_dns,
         )
         self.daemon_status = {}
         self._daemon_rules = []          # latest rules pushed by the daemon
         self._rules_win = None           # open RulesWindow, if any
         self._verdicts = {}              # (ip, port, proto) -> "allow"/"deny"
+        self._dns_names = {}             # ip -> hostname the app resolved (DNS capture)
         self._geo_points = {}            # ip -> {lon,lat,kind,label,ts} for the map
         self._prompt_queue = []          # (flow, on_choice) awaiting display
         self._prompt_active = False      # a prompt window is currently open
@@ -136,6 +146,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self._install_actions()
 
         self.connect("close-request", self._on_close)
+        self._track_activity(app)
         self.start_timer()
         GLib.timeout_add_seconds(6, self._prime_alerts)
         if (not self.using_daemon and self.config.get("enforce_enabled")
@@ -217,7 +228,9 @@ class MainWindow(Gtk.ApplicationWindow):
         menu.append("Export visible to CSV…", "win.export")
         menu.append("Export rules…", "win.exportrules")
         menu.append("Import rules…", "win.importrules")
+        menu.append("Export alert log…", "win.exportalerts")
         menu.append("Clear alert log", "win.clearalerts")
+        menu.append("Lock now", "win.lock")
         menu.append("About GeoNetMon", "win.about")
         menu.append("Quit", "app.quit")
         btn_menu = Gtk.MenuButton(icon_name="emblem-system-symbolic")
@@ -360,7 +373,7 @@ class MainWindow(Gtk.ApplicationWindow):
                 ctx.line_to(x, y)
         ctx.stroke()
 
-    def _add_columns(self, cv=None):
+    def _add_columns(self, cv=None, tree=False):
         target = cv if cv is not None else self.column_view
         cols = [
             ("IP Address", _r_ip, lambda o: o.ip, False, 150),
@@ -384,9 +397,12 @@ class MainWindow(Gtk.ApplicationWindow):
         if self.config["show_pid_column"]:
             cols.append(("PID", _r_pid, lambda o: o.pid, False, 80))
 
-        for title, render, sort_key, expand, width in cols:
+        for i, (title, render, sort_key, expand, width) in enumerate(cols):
             factory = Gtk.SignalListItemFactory()
-            factory.connect("setup", self._cell_setup)
+            # Tree views (past connections) put a TreeExpander on the first
+            # column so ×N group rows can be expanded to their instances.
+            factory.connect("setup", self._cell_setup_tree
+                            if tree and i == 0 else self._cell_setup)
             factory.connect("bind", self._cell_bind, render)
             factory.connect("unbind", self._cell_unbind)
             col = Gtk.ColumnViewColumn(title=title, factory=factory)
@@ -435,8 +451,14 @@ class MainWindow(Gtk.ApplicationWindow):
             Gtk.RevealerTransitionType.SLIDE_DOWN)
         self._past_revealer.set_reveal_child(False)
 
+        # Duplicate past connections (e.g. dnscrypt-proxy probing the same
+        # resolver every few seconds) coalesce into one expandable group row:
+        # the leader shows "×N" and its TreeExpander reveals every instance.
         self._past_store = Gio.ListStore.new(ConnectionObject)
-        past_sel = Gtk.SingleSelection(model=self._past_store)
+        self._past_groups = {}   # (ip, port, proto, app, dir) -> leader obj
+        past_tree = Gtk.TreeListModel.new(
+            self._past_store, False, False, self._past_children)
+        past_sel = Gtk.SingleSelection(model=past_tree)
         past_sel.set_autoselect(False)
         past_sel.set_can_unselect(True)
 
@@ -444,7 +466,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self._past_cv.set_show_column_separators(True)
         self._past_cv.set_show_row_separators(True)
         self._past_cv.connect("activate", self._on_past_row_activate)
-        self._add_columns(self._past_cv)
+        self._add_columns(self._past_cv, tree=True)
 
         past_scroller = Gtk.ScrolledWindow()
         past_scroller.set_child(self._past_cv)
@@ -460,28 +482,72 @@ class MainWindow(Gtk.ApplicationWindow):
 
     _MAX_PAST = 200
 
+    @staticmethod
+    def _past_children(item):
+        """TreeListModel child factory: group leaders expand to their dupes."""
+        if not isinstance(item, ConnectionObject):
+            return None
+        dupes = getattr(item, "dupes", None)
+        if not dupes:
+            return None
+        store = getattr(item, "_dup_store", None)
+        if store is None:
+            store = Gio.ListStore.new(ConnectionObject)
+            for d in dupes:
+                store.append(d)
+            item._dup_store = store
+        return store
+
+    @staticmethod
+    def _past_sig(obj):
+        return (obj.ip, obj.port, (obj.proto or "").lower(),
+                obj.application, obj.direction)
+
     def _add_to_past(self, obj):
         key = obj.key
         if key in self._past_objs:
             return
-        if len(self._past_objs) >= self._MAX_PAST:
-            oldest_key = next(iter(self._past_objs))
-            oldest = self._past_objs.pop(oldest_key)
-            found, pos = self._past_store.find(oldest)
-            if found:
-                self._past_store.remove(pos)
         obj.set_property("is_new", False)
         self._past_objs[key] = obj
-        self._past_store.insert(0, obj)
+        sig = self._past_sig(obj)
+        leader = self._past_groups.get(sig)
+        if leader is not None and leader is not obj:
+            # repeat of an existing group — attach under the leader
+            leader.dupes.insert(0, obj)
+            store = getattr(leader, "_dup_store", None)
+            if store is not None:      # group already expanded once
+                store.insert(0, obj)
+            leader.set_property("dup_count", len(leader.dupes) + 1)
+        else:
+            obj.dupes = []
+            obj._dup_store = None
+            self._past_groups[sig] = obj
+            if self._past_store.get_n_items() >= self._MAX_PAST:
+                self._evict_oldest_past_group()
+            self._past_store.insert(0, obj)
         self._past_label.set_text(f"Past connections ({len(self._past_objs)})")
+
+    def _evict_oldest_past_group(self):
+        n = self._past_store.get_n_items()
+        if not n:
+            return
+        oldest = self._past_store.get_item(n - 1)   # leaders insert at 0
+        self._past_store.remove(n - 1)
+        self._past_groups.pop(self._past_sig(oldest), None)
+        self._past_objs.pop(oldest.key, None)
+        for d in getattr(oldest, "dupes", None) or []:
+            self._past_objs.pop(d.key, None)
 
     def _clear_past(self, *_):
         self._past_objs.clear()
+        self._past_groups.clear()
         self._past_store.remove_all()
         self._past_label.set_text("Past connections (0)")
 
     def _on_past_row_activate(self, cv, position):
         obj = cv.get_model().get_item(position)
+        if isinstance(obj, Gtk.TreeListRow):
+            obj = obj.get_item()
         if obj is not None:
             DetailWindow(self, obj, self.firewall, window=self).present()
 
@@ -585,8 +651,10 @@ class MainWindow(Gtk.ApplicationWindow):
     # ===================================================================
     def _show_whois(self, ip):
         import subprocess, threading
+        from .ui import escape_closes
         win = Gtk.Window(title=f"Whois  {ip}", transient_for=self)
         win.set_default_size(580, 500)
+        escape_closes(win)
         buf = Gtk.TextBuffer()
         buf.set_text("Running whois…")
         tv = Gtk.TextView(buffer=buf, editable=False,
@@ -623,12 +691,29 @@ class MainWindow(Gtk.ApplicationWindow):
         label.add_controller(gesture)
         list_item.set_child(label)
 
+    def _cell_setup_tree(self, factory, list_item):
+        """First column of a tree view: same label inside a TreeExpander."""
+        self._cell_setup(factory, list_item)
+        label = list_item.get_child()
+        expander = Gtk.TreeExpander()
+        expander.set_child(label)
+        list_item.set_child(expander)
+
     # Renders whose output should be blurred in privacy mode
     _PRIVATE_RENDERS = None  # set after class body; references _r_ip, _r_rdns
 
     def _cell_bind(self, _factory, list_item, render):
         label = list_item.get_child()
         obj = list_item.get_item()
+        # Tree views hand us TreeListRow wrappers; unwrap to the real object
+        # and point the first column's expander at the row.
+        if isinstance(obj, Gtk.TreeListRow):
+            row = obj
+            obj = row.get_item()
+            if isinstance(label, Gtk.TreeExpander):
+                label.set_list_row(row)
+        if isinstance(label, Gtk.TreeExpander):
+            label = label.get_child()
 
         if self._PRIVATE_RENDERS is None:
             MainWindow._PRIVATE_RENDERS = {_r_ip, _r_rdns}
@@ -725,6 +810,10 @@ class MainWindow(Gtk.ApplicationWindow):
         except RuntimeError as exc:
             self.lbl_counts.set_text(f"Error: {exc}")
             return
+        # Ask the daemon for its passively-sniffed ip->hostname map; the reply
+        # arrives async via _on_daemon_dns. Cheap: one small JSON round-trip.
+        if self.using_daemon:
+            self.daemon.get_dns()
         # Fill in process names the unprivileged GUI couldn't see, from the root
         # daemon's published map. No-op if the daemon isn't running.
         daemon_procs = collector.enrich_from_daemon(conns)
@@ -736,6 +825,8 @@ class MainWindow(Gtk.ApplicationWindow):
             obj = self.objs.get(c.key)
             if obj is None:
                 obj = ConnectionObject(c)
+                if obj.geo_ip in self._dns_names:
+                    obj.set_dns_name(self._dns_names[obj.geo_ip])
                 self.objs[c.key] = obj
                 self.store.append(obj)
                 self.alerts.on_appear(obj)
@@ -948,14 +1039,28 @@ class MainWindow(Gtk.ApplicationWindow):
             ("blocklists", self._act_blocklists),
             ("firewall", self._act_firewall),
             ("export", self._act_export),
+            ("exportalerts", self._act_export_alerts),
             ("exportrules", self._act_export_rules),
             ("importrules", self._act_import_rules),
             ("clearalerts", self._act_clear_alerts),
             ("about", self._act_about),
+            ("lock", self._act_lock),
         ]:
             action = Gio.SimpleAction.new(name, None)
             action.connect("activate", cb)
             self.add_action(action)
+            if name == "lock":
+                self._lock_action = action
+        self._sync_lock_action()
+
+    def _sync_lock_action(self):
+        """Lock now only makes sense once a password exists."""
+        self._lock_action.set_enabled(bool(self.config.get("app_lock_hash")))
+
+    def _act_lock(self, *_):
+        app = self.get_application()
+        if app and hasattr(app, "lock_now"):
+            app.lock_now()
 
     def _act_preferences(self, *_):
         win = SettingsWindow(self, self.config, self._on_settings_changed)
@@ -1076,6 +1181,11 @@ class MainWindow(Gtk.ApplicationWindow):
             btn.add_css_class("enforcing")
         else:
             btn.remove_css_class("enforcing")
+        # Mirror the shield state on the tray icon (overlay/tooltip/menu).
+        app = self.get_application()
+        tray = getattr(app, "_tray", None)
+        if tray is not None and hasattr(tray, "set_enforcing"):
+            tray.set_enforcing(self._enf_running())
 
     def _on_shield_toggled(self, btn):
         want = btn.get_active()
@@ -1144,6 +1254,7 @@ class MainWindow(Gtk.ApplicationWindow):
 
     # ---- daemon-mode callbacks -----------------------------------------
     def _on_daemon_prompt(self, prompt_id, flow):
+        self._learn_dns_name(flow)
         entry = self.enricher.cache.get(flow.get("dst_ip"))
         if entry:
             flow.setdefault("org", entry.get("org", ""))
@@ -1204,6 +1315,24 @@ class MainWindow(Gtk.ApplicationWindow):
                     obj.verdict = rule.action
                     break
 
+    def _on_daemon_dns(self, dmap):
+        """Merge the daemon's passively-sniffed ip->hostname map (monitor-mode
+        equivalent of the per-flow dst_host learning)."""
+        if not isinstance(dmap, dict):
+            return False
+        for ip, host in dmap.items():
+            if (not isinstance(ip, str) or not isinstance(host, str)
+                    or not host or self._dns_names.get(ip) == host):
+                continue
+            self._dns_names[ip] = host
+            for obj in self.objs.values():
+                if obj.geo_ip == ip:
+                    obj.set_dns_name(host)
+        if len(self._dns_names) > 4000:      # bound memory
+            for k in list(self._dns_names)[:2000]:
+                del self._dns_names[k]
+        return False
+
     def _on_daemon_disconnect(self):
         self.using_daemon = False
         self.daemon_status = {}
@@ -1216,6 +1345,7 @@ class MainWindow(Gtk.ApplicationWindow):
 
     # ---- in-process-mode callbacks -------------------------------------
     def _on_prompt(self, prompt_id, flow):
+        self._learn_dns_name(flow)
         entry = self.enricher.cache.get(flow.get("dst_ip"))
         if entry:
             flow.setdefault("org", entry.get("org", ""))
@@ -1229,6 +1359,28 @@ class MainWindow(Gtk.ApplicationWindow):
             self._on_enforce_decision(flow, action, auto=False)
         self._show_or_queue_prompt(flow, on_choice)
         return False
+
+    def _learn_dns_name(self, flow):
+        """Firewall flows carry dst_host from the daemon's DNS capture — the
+        hostname the app actually asked for. Remember it per IP so rows whose
+        reverse DNS comes back empty (CDN IPs on 443, typically) can still
+        show a meaningful name."""
+        ip = flow.get("dst_ip")
+        host = flow.get("dst_host") or ""
+        if not ip or not host or host == ip:
+            return
+        try:                        # an IP echoed back is not a hostname
+            ipaddress.ip_address(host)
+            return
+        except ValueError:
+            pass
+        self._dns_names[ip] = host
+        for obj in self.objs.values():
+            if obj.geo_ip == ip:
+                obj.set_dns_name(host)
+        if len(self._dns_names) > 4000:     # bound memory
+            for k in list(self._dns_names)[:2000]:
+                del self._dns_names[k]
 
     def _record_verdict(self, flow, action):
         """Remember the firewall's allow/deny for a remote endpoint so the main
@@ -1246,6 +1398,7 @@ class MainWindow(Gtk.ApplicationWindow):
                 del self._verdicts[k]
 
     def _on_enforce_decision(self, flow, action, auto):
+        self._learn_dns_name(flow)
         self._record_verdict(flow, action)
         if action == "allow":
             key = "enforce_notify_allow_auto" if auto else "enforce_notify_allow"
@@ -1275,7 +1428,13 @@ class MainWindow(Gtk.ApplicationWindow):
         app = self.get_application()
         if app and hasattr(app, "apply_theme"):
             app.apply_theme()
+        self._sync_lock_action()
         self.enricher.reload_geoip()
+        # The sniffer lives in the root daemon, which reads its own config —
+        # push the toggle over IPC so the switch takes effect live.
+        if self.using_daemon:
+            self.daemon.set_config("dns_sniff",
+                                   bool(self.config.get("dns_sniff", True)))
         # apply enforcement on/off changes made in Preferences (in-process only;
         # daemon mode is controlled via the shield button / daemon config)
         if not self.using_daemon and self.engine:
@@ -1307,6 +1466,31 @@ class MainWindow(Gtk.ApplicationWindow):
         about.set_website("https://www.jegly.xyz")
         about.set_website_label("jegly.xyz")
         about.present()
+
+    def _act_export_alerts(self, *_):
+        dlg = Gtk.FileDialog()
+        dlg.set_initial_name("geonetmon-alerts.csv")
+        dlg.save(self, None, self._export_alerts_done)
+
+    def _export_alerts_done(self, dlg, result):
+        try:
+            gfile = dlg.save_finish(result)
+        except GLib.Error:
+            return
+        path = gfile.get_path()
+        if not path:
+            return
+        try:
+            with open(path, "w", newline="", encoding="utf-8") as fh:
+                writer = csv.writer(fh)
+                writer.writerow(["Time", "Level", "Title", "Detail"])
+                for a in self.alerts.log:
+                    writer.writerow([
+                        time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(a.ts)),
+                        a.level, a.title, a.body,
+                    ])
+        except OSError:
+            pass
 
     def _act_export(self, *_):
         dlg = Gtk.FileDialog()
@@ -1360,6 +1544,8 @@ class MainWindow(Gtk.ApplicationWindow):
 
     def _on_cell_right_click(self, gesture, _n, x, y, list_item):
         obj = list_item.get_item()
+        if isinstance(obj, Gtk.TreeListRow):
+            obj = obj.get_item()
         if obj is None:
             return
         gesture.set_state(Gtk.EventSequenceState.CLAIMED)
@@ -1402,6 +1588,10 @@ class MainWindow(Gtk.ApplicationWindow):
 
         btn("Details / lsof…",
             lambda: DetailWindow(self, obj, self.firewall, window=self).present())
+
+        if obj.ip:
+            btn(f"Copy IP  {obj.ip}",
+                lambda: self.get_clipboard().set(obj.ip))
 
         if obj.application:
             btn(f"Filter to  {obj.application}",
@@ -1478,7 +1668,39 @@ class MainWindow(Gtk.ApplicationWindow):
         self.get_clipboard().set(cmd)
         dlg.show(self)
 
+    def _track_activity(self, app):
+        """Feed user input to the app's idle clock (for auto-lock). CAPTURE
+        phase so we see events even when a child widget consumes them."""
+        if not hasattr(app, "touch_activity"):
+            return
+
+        def touch(*_):
+            app.touch_activity()
+            return False
+
+        motion = Gtk.EventControllerMotion()
+        motion.connect("motion", touch)
+        keys = Gtk.EventControllerKey()
+        keys.connect("key-pressed", touch)
+        click = Gtk.GestureClick()
+        click.set_button(0)                 # any button
+        click.connect("pressed", touch)
+        for ctrl in (motion, keys, click):
+            ctrl.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+            self.add_controller(ctrl)
+
+    def _save_win_state(self):
+        """Remember size + maximized so the next launch restores it."""
+        self.config["win_maximized"] = bool(self.is_maximized())
+        if not self.is_maximized():
+            w, h = self.get_width(), self.get_height()
+            if w > 0 and h > 0:
+                self.config["win_width"] = w
+                self.config["win_height"] = h
+        self.config.save()
+
     def _on_close(self, *_):
+        self._save_win_state()
         # Background mode: hide the window, keep daemon/engine/monitor alive.
         if self.config.get("run_in_background"):
             self.set_visible(False)

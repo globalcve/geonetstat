@@ -55,12 +55,21 @@ class AlertManager:
                     "countries": sorted(self.seen_countries),
                     "ips": sorted(self.seen_ips),
                 }, fh)
+            os.chmod(self._state_path, 0o600)   # seen-IP list — owner-only
         except OSError:
             pass
 
     def prime_done(self):
         """Called after the first refresh so the initial snapshot isn't alerted."""
         self._primed = True
+
+    def reset_seen(self):
+        """Forget every known app/country/IP so 'new X' alerts re-prime."""
+        self.seen_apps.clear()
+        self.seen_countries.clear()
+        self.seen_ips.clear()
+        self._risk_seen.clear()
+        self.save()
 
     # ---- checks ---------------------------------------------------------
     def on_appear(self, obj):

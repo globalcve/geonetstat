@@ -2,14 +2,17 @@
 
 from gi.repository import Gtk
 
+from . import applock
 from . import themes
 from . import ports
+from .ui import escape_closes
 
 
 class SettingsWindow(Gtk.Window):
     def __init__(self, parent, config, on_change):
         super().__init__(title="Preferences", transient_for=parent)
         self.set_default_size(540, 680)
+        escape_closes(self)
         self.config = config
         self.on_change = on_change
 
@@ -53,6 +56,39 @@ class SettingsWindow(Gtk.Window):
         self.drop_accent.connect("notify::selected", self._set_accent)
         box.append(self._row("Accent colour", self.drop_accent))
 
+        # ---- Security ----
+        box.append(self._heading("Security"))
+        lhint = Gtk.Label(
+            label="Ask for a password before the window opens. This guards "
+                  "casual access to the UI only — it does not encrypt the "
+                  "history, cache, or config on disk.",
+            xalign=0, wrap=True,
+        )
+        lhint.add_css_class("dim-label")
+        box.append(lhint)
+
+        self.sw_lock = Gtk.Switch(
+            active=bool(config["app_lock_enabled"] and config["app_lock_hash"]))
+        self.sw_lock.set_valign(Gtk.Align.CENTER)
+        self.sw_lock.connect("state-set", self._on_lock_switch)
+        box.append(self._row("Require password on launch", self.sw_lock))
+
+        self.btn_change_pw = Gtk.Button(label="Change password…")
+        self.btn_change_pw.set_sensitive(bool(config["app_lock_hash"]))
+        self.btn_change_pw.connect("clicked", self._on_change_pw)
+        box.append(self._row("Password", self.btn_change_pw))
+
+        adj_idle = Gtk.Adjustment(
+            value=config["app_lock_idle_min"], lower=0, upper=480,
+            step_increment=5, page_increment=15,
+        )
+        self.spin_idle = Gtk.SpinButton(adjustment=adj_idle, climb_rate=1,
+                                        digits=0)
+        self.spin_idle.connect("value-changed", self._set_int,
+                               "app_lock_idle_min")
+        box.append(self._row("Auto-lock after idle (minutes, 0 = off)",
+                             self.spin_idle))
+
         # ---- Display ----
         box.append(self._heading("Display"))
         for key, label in [
@@ -70,6 +106,14 @@ class SettingsWindow(Gtk.Window):
 
         box.append(self._switch_row("Run in background when window closed",
                                     "run_in_background"))
+
+        # Autostart: the XDG desktop file is the source of truth, not config.
+        from . import config as cfg_mod
+        self.sw_autostart = Gtk.Switch(active=cfg_mod.autostart_enabled())
+        self.sw_autostart.set_valign(Gtk.Align.CENTER)
+        self.sw_autostart.connect("state-set", self._on_autostart)
+        box.append(self._row("Start on login (needs installed 'geonetmon' "
+                             "launcher)", self.sw_autostart))
 
         adj_rows = Gtk.Adjustment(
             value=config["max_rows"], lower=0, upper=5000,
@@ -91,6 +135,10 @@ class SettingsWindow(Gtk.Window):
         box.append(self._heading("Enrichment (network lookups)"))
         box.append(self._switch_row("Resolve geolocation (ipinfo.io)", "resolve_geo"))
         box.append(self._switch_row("Resolve reverse DNS", "resolve_rdns"))
+        box.append(self._switch_row(
+            "Passive DNS capture — daemon learns hostnames from DNS replies "
+            "(shows real names for CDN IPs with no reverse DNS)",
+            "dns_sniff"))
 
         self.entry_token = Gtk.Entry(text=config["ipinfo_token"])
         self.entry_token.set_placeholder_text("optional ipinfo.io token")
@@ -270,6 +318,11 @@ class SettingsWindow(Gtk.Window):
         box.append(self._switch_row("High-risk host (AbuseIPDB ≥ 50)",
                                     "alert_high_risk"))
 
+        self.btn_reset_seen = Gtk.Button(label="Reset now")
+        self.btn_reset_seen.connect("clicked", self._on_reset_seen)
+        box.append(self._row("Forget seen apps/countries/IPs "
+                             "(re-primes 'new X' alerts)", self.btn_reset_seen))
+
         # ---- History ----
         box.append(self._heading("History"))
         box.append(self._switch_row("Log connection history (SQLite)",
@@ -353,6 +406,46 @@ class SettingsWindow(Gtk.Window):
     def _set_text(self, entry, key):
         self.config[key] = entry.get_text().strip()
         self._commit()
+
+    def _on_lock_switch(self, sw, state):
+        """Enabling with no password set first asks for one; cancelling the
+        dialog leaves the lock off."""
+        if state and not self.config["app_lock_hash"]:
+            def done(phc):
+                if phc:
+                    self.config["app_lock_hash"] = phc
+                    self.config["app_lock_enabled"] = True
+                    self._commit()
+                    self.btn_change_pw.set_sensitive(True)
+                    sw.set_state(True)
+                else:
+                    sw.set_active(False)
+            applock.SetPasswordDialog(self, done).present()
+            return True   # hold the switch until the dialog answers
+        self.config["app_lock_enabled"] = bool(state)
+        self._commit()
+        return False
+
+    def _on_change_pw(self, _btn):
+        def done(phc):
+            if phc:
+                self.config["app_lock_hash"] = phc
+                self._commit()
+        applock.SetPasswordDialog(self, done).present()
+
+    def _on_autostart(self, sw, state):
+        from . import config as cfg_mod
+        if not cfg_mod.set_autostart(bool(state)):
+            sw.set_active(cfg_mod.autostart_enabled())  # write failed — revert
+        return False
+
+    def _on_reset_seen(self, btn):
+        win = self.get_transient_for()
+        alerts = getattr(win, "alerts", None)
+        if alerts is not None:
+            alerts.reset_seen()
+            btn.set_label("Done ✓")
+            btn.set_sensitive(False)
 
     def _set_theme(self, drop, _param):
         self.config["theme"] = themes.id_at(drop.get_selected())

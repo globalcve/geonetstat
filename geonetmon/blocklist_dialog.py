@@ -5,6 +5,7 @@ import time
 
 from gi.repository import Gtk, GLib
 
+from .ui import escape_closes
 
 
 SUGGESTED = [
@@ -46,6 +47,7 @@ class BlocklistWindow(Gtk.Window):
     def __init__(self, parent, blocklist_mgr):
         super().__init__(title="Blocklist subscriptions", transient_for=parent)
         self.set_default_size(620, 540)
+        escape_closes(self)
         self.mgr = blocklist_mgr
 
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)

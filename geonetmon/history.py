@@ -54,6 +54,13 @@ class History:
             self.conn.commit()
         except sqlite3.Error:
             self.conn = None
+            return
+        try:
+            # Owner-only: a connection history other local users have no
+            # business reading. Best-effort — never disables logging.
+            os.chmod(self.path, 0o600)
+        except OSError:
+            pass
 
     # ---- writes ---------------------------------------------------------
     def log_event(self, event, obj):

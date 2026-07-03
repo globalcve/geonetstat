@@ -96,11 +96,45 @@ def parse_dns_answers(payload):
         return "", []
 
 
-class DNSCache:
-    """IP -> (hostname, expiry). Most recent answer wins."""
+def dns_payload_from_frame(frame):
+    """From a raw ethernet frame, return the UDP payload of a source-port-53
+    packet, or b"" for anything else. IPv4 and IPv6, no extension headers or
+    fragments (the sniffer's kernel BPF filter pre-selects the same shapes,
+    so this is a defensive re-check, not the primary filter)."""
+    try:
+        if len(frame) < 14 + 20:
+            return b""
+        ethertype = int.from_bytes(frame[12:14], "big")
+        off = 14
+        if ethertype == 0x0800:                       # IPv4
+            ihl = (frame[off] & 0x0F) * 4
+            if ihl < 20 or frame[off + 9] != 17:      # protocol UDP
+                return b""
+            if int.from_bytes(frame[off + 6:off + 8], "big") & 0x1FFF:
+                return b""                            # non-first fragment
+            udp = off + ihl
+        elif ethertype == 0x86DD:                     # IPv6
+            if len(frame) < off + 40 or frame[off + 6] != 17:
+                return b""                            # next-header UDP only
+            udp = off + 40
+        else:
+            return b""
+        if len(frame) < udp + 8:
+            return b""
+        if int.from_bytes(frame[udp:udp + 2], "big") != 53:
+            return b""
+        return bytes(frame[udp + 8:])
+    except (IndexError, ValueError):
+        return b""
 
-    def __init__(self, ttl=900):
+
+class DNSCache:
+    """IP -> (hostname, expiry). Most recent answer wins. Size-capped so a
+    flood of forged responses can't balloon daemon memory."""
+
+    def __init__(self, ttl=900, max_entries=4096):
         self.ttl = ttl
+        self.max_entries = max_entries
         self._map = {}
 
     def ingest(self, payload):
@@ -110,6 +144,11 @@ class DNSCache:
         now = time.time()
         for ip in ips:
             self._map[ip] = (qname, now + self.ttl)
+        if len(self._map) > self.max_entries:
+            self.prune()
+            while len(self._map) > self.max_entries:   # still over: drop oldest
+                oldest = min(self._map, key=lambda k: self._map[k][1])
+                del self._map[oldest]
         return qname, ips
 
     def hostname(self, ip):
@@ -126,3 +165,8 @@ class DNSCache:
         now = time.time()
         for ip in [k for k, (_n, e) in self._map.items() if e < now]:
             self._map.pop(ip, None)
+
+    def snapshot(self):
+        """Fresh {ip: hostname} dict (expired entries dropped) for the GUI."""
+        self.prune()
+        return {ip: name for ip, (name, _e) in self._map.items()}

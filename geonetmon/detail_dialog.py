@@ -9,12 +9,14 @@ from gi.repository import Gtk, Gdk, GLib
 
 from . import ports
 from .models import human_bytes, human_rate
+from .ui import escape_closes
 
 
 class DetailWindow(Gtk.Window):
     def __init__(self, parent, obj, firewall=None, window=None):
         super().__init__(title="Connection details", transient_for=parent)
         self.set_default_size(560, 640)
+        escape_closes(self)
         self.obj = obj
         self.firewall = firewall
         self._window = window  # MainWindow ref for daemon IPC / deny action
@@ -42,6 +44,9 @@ class DetailWindow(Gtk.Window):
         risk = "—"
         if getattr(obj, "risk", -1) >= 0:
             risk = f"{obj.risk}/100 (AbuseIPDB)"
+        ptr = getattr(obj, "ptr", "") or ""
+        dns_name = getattr(obj, "dns_name", "") or ""
+        geo_host = getattr(obj, "geo_hostname", "") or ""
         rows = [
             ("Remote IP",       obj.ip),
             ("Protocol",        obj.proto.upper()),
@@ -63,7 +68,10 @@ class DetailWindow(Gtk.Window):
             ("Location",        obj.location),
             ("Country",         f"{ports.flag_emoji(cc)} {ports.country_name(cc)}"
                                 if cc else "—"),
-            ("Reverse DNS",     obj.rdns),
+            ("Reverse DNS (PTR)", ptr or ("none published"
+                                          if obj.enriched else "…")),
+            ("DNS name (observed)", dns_name),
+            ("Provider hostname", geo_host),
             ("GeoNetMon rule",  obj.verdict or "—"),
         ]
         for i, (label, value) in enumerate(rows):
@@ -72,6 +80,23 @@ class DetailWindow(Gtk.Window):
             val = Gtk.Label(label=value or "—", xalign=0, selectable=True, wrap=True)
             grid.attach(key, 0, i, 1, 1)
             grid.attach(val, 1, i, 1, 1)
+
+        # When the row reads "unknown", say why instead of leaving a mystery.
+        if obj.enriched and obj.remote_ip and not ptr and not dns_name:
+            why = Gtk.Label(
+                label="Why unknown? This IP publishes no reverse-DNS (PTR) "
+                      "record — common for CDN and cloud hosts serving HTTPS "
+                      "on port 443, where many sites share one IP. The "
+                      "organisation/location above (when present) comes from "
+                      "the IP's registration, not the site name. When the "
+                      "GeoNetMon daemon is running, it passively captures the "
+                      "DNS lookups apps make (Preferences → Enrichment), so "
+                      "future connections show the hostname that was actually "
+                      "requested.",
+                xalign=0, wrap=True,
+            )
+            why.add_css_class("dim-label")
+            box.append(why)
 
         raw_label = Gtk.Label(label="Raw ss line", xalign=0)
         raw_label.add_css_class("dim-label")
@@ -100,6 +125,10 @@ class DetailWindow(Gtk.Window):
         ipinfo = Gtk.Button(label="ipinfo.io ↗")
         ipinfo.connect("clicked", self._open_ipinfo)
         btns.append(ipinfo)
+
+        abuse = Gtk.Button(label="AbuseIPDB ↗")
+        abuse.connect("clicked", self._open_abuseipdb)
+        btns.append(abuse)
 
         # Deny app rule — always show for non-listening connections when we have
         # a window reference; allow the user to deny even if already "Allowed".
@@ -323,6 +352,13 @@ class DetailWindow(Gtk.Window):
         if not self.obj.ip:
             return
         Gtk.UriLauncher.new(f"https://ipinfo.io/{self.obj.ip}").launch(
+            self, None, None, None)
+
+    def _open_abuseipdb(self, *_):
+        if not self.obj.ip:
+            return
+        Gtk.UriLauncher.new(
+            f"https://www.abuseipdb.com/check/{self.obj.ip}").launch(
             self, None, None, None)
 
     def _kill(self, *_):

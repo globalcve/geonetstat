@@ -13,6 +13,8 @@ import math
 
 from gi.repository import Gtk, Gdk, GLib, Pango
 
+from .ui import escape_closes
+
 from .world_outline import COASTLINE
 
 
@@ -312,6 +314,7 @@ class MapWindow(Gtk.Window):
     def __init__(self, parent, get_points, home=None, dark=True):
         super().__init__(title="Connection map", transient_for=parent)
         self.set_default_size(1100, 560)
+        escape_closes(self)
         self._parent_win = parent   # MainWindow ref for firewall actions
         self._get_points = get_points
         self._dark = dark

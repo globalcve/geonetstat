@@ -1,6 +1,7 @@
 """Gtk.Application: wires up the window, CSS, and global actions."""
 
 import sys
+import time
 
 import gi
 gi.require_version("Gtk", "4.0")
@@ -24,10 +25,17 @@ class GeoNetMonApp(Gtk.Application):
         self._css_provider = None
         self._tray = None
         self._held = False
+        # Start locked only when the launch-lock is on; "Lock now" can re-lock
+        # any session that has a password set, even with the launch-lock off.
+        self._unlocked = not (self.config.get("app_lock_enabled")
+                              and self.config.get("app_lock_hash"))
+        self._lock_win = None
+        self._last_activity = time.time()
 
     def do_startup(self):
         Gtk.Application.do_startup(self)
         self._load_css()
+        GLib.timeout_add_seconds(30, self._idle_lock_check)
         quit_action = Gio.SimpleAction.new("quit", None)
         quit_action.connect("activate", lambda *_: self._real_quit())
         self.add_action(quit_action)
@@ -44,6 +52,23 @@ class GeoNetMonApp(Gtk.Application):
             self.win._prompt_win.present()
 
     def _maybe_tray(self):
+        # Prefer the native SNI tray (works in a GTK4 process and carries the
+        # right-click menu); fall back to the appindicator wrapper.
+        try:
+            from . import tray_sni
+            if tray_sni.available():
+                self._tray = tray_sni.SNITray(
+                    __app_id__,
+                    on_show=self._present_window,
+                    on_toggle_pause=self._tray_toggle_pause,
+                    on_toggle_enforce=self._tray_toggle_enforce,
+                    on_lock=self.lock_now,
+                    on_quit=self._real_quit,
+                    get_state=self._tray_state,
+                )
+                return
+        except Exception:  # noqa: BLE001 — tray is best-effort
+            self._tray = None
         if not tray_mod.available():
             return
         try:
@@ -56,22 +81,92 @@ class GeoNetMonApp(Gtk.Application):
         except Exception:  # noqa: BLE001 — tray is best-effort
             self._tray = None
 
+    def _tray_state(self):
+        """Fresh state for the tray menu (pulled on every menu open)."""
+        win = self.win
+        return {
+            "paused": bool(win and win.paused),
+            "enforcing": bool(win and win.btn_shield.get_active()),
+            "lock": bool(self.config.get("app_lock_hash")),
+        }
+
+    def _tray_toggle_pause(self, on):
+        if self.win:
+            self.win.btn_pause.set_active(bool(on))
+
     def _present_window(self):
+        if self._locked():
+            self._present_lock()
+            return
         if not self.win:
             self.win = MainWindow(self, self.config)
         self.win.present()
+
+    # ---- app-lock (optional password gate, see applock.py) --------------
+    def _locked(self):
+        return bool(self.config.get("app_lock_hash") and not self._unlocked)
+
+    def _present_lock(self):
+        if self._lock_win is None:
+            from .applock import LockWindow
+            self._lock_win = LockWindow(
+                self, self.config["app_lock_hash"], self._on_unlocked)
+        self._lock_win.present()
+
+    def _on_unlocked(self):
+        self._unlocked = True
+        self._lock_win = None
+        self.activate()
+
+    def lock_now(self):
+        """Menu action: hide the main window behind the lock screen again."""
+        if not self.config.get("app_lock_hash"):
+            return
+        self._unlocked = False
+        if self.win:
+            self.win.set_visible(False)
+        self._present_lock()
+
+    def touch_activity(self):
+        """Called by the main window on any input — resets the idle clock."""
+        self._last_activity = time.time()
+
+    def _idle_lock_check(self):
+        mins = int(self.config.get("app_lock_idle_min") or 0)
+        if (not mins or not self.config.get("app_lock_hash")
+                or self._locked()):
+            return True
+        if time.time() - self._last_activity < mins * 60:
+            return True
+        # Idle limit hit: re-lock. If the window is hidden (background mode),
+        # lock silently — the gate appears on the next Show instead of popping
+        # a lock screen out of nowhere.
+        self._unlocked = False
+        if self.win and self.win.get_visible():
+            self.win.set_visible(False)
+            self._present_lock()
+        return True
 
     def _tray_toggle_enforce(self, on):
         if self.win:
             self.win.btn_shield.set_active(on)
 
     def _real_quit(self):
+        if self._tray is not None and hasattr(self._tray, "close"):
+            try:
+                self._tray.close()
+            except Exception:  # noqa: BLE001 — never let the tray block quit
+                pass
+            self._tray = None
         if self._held:
             self.release()
             self._held = False
         self.quit()
 
     def do_activate(self):
+        if self._locked():
+            self._present_lock()
+            return
         if not self.win:
             self.win = MainWindow(self, self.config)
         self.win.present()

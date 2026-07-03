@@ -6,6 +6,7 @@ drawn from the SQLite history plus the live model.
 from gi.repository import Gtk
 
 from . import ports
+from .ui import escape_closes
 
 
 _WINDOWS = [("Last hour", 3600), ("Last 24h", 86400),
@@ -100,6 +101,7 @@ class StatsWindow(Gtk.Window):
     def __init__(self, parent, history, live_objs):
         super().__init__(title="Statistics", transient_for=parent)
         self.set_default_size(720, 640)
+        escape_closes(self)
         self.history = history
         self.live_objs = live_objs
         self._window_secs = 86400

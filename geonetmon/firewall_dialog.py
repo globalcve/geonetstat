@@ -4,12 +4,14 @@ import time
 
 from gi.repository import Gtk
 
+from .ui import escape_closes
 
 
 class FirewallWindow(Gtk.Window):
     def __init__(self, parent, firewall):
         super().__init__(title="Firewall — blocked IPs", transient_for=parent)
         self.set_default_size(560, 480)
+        escape_closes(self)
         self.fw = firewall
 
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)

@@ -19,6 +19,8 @@ DEFAULTS = {
     # Enrichment
     "resolve_geo": True,
     "resolve_rdns": True,
+    "dns_sniff": True,             # daemon: passively capture DNS responses
+                                   # (hostnames without enforcement)
     "ipinfo_token": "",
     "home_country": "",            # e.g. "GB" — anything else is flagged foreign
     "cache_ttl_hours": 168,        # 7 days
@@ -71,8 +73,13 @@ DEFAULTS = {
     "alert_unencrypted_foreign": False,
     "alert_high_risk": True,       # AbuseIPDB score above threshold
 
+    # Security
+    "app_lock_enabled": False,     # ask for a password when the GUI starts
+    "app_lock_hash": "",           # PBKDF2 hash (see applock.py); "" = unset
+    "app_lock_idle_min": 0,        # re-lock after N idle minutes (0 = off)
+
     # UI
-    "theme": "system",            # system | dracula | catppuccin-*
+    "theme": "system",            # system | dracula | catppuccin-* | …
     "accent": "",                 # "" = theme default, else a themes.ACCENT_PALETTE name
     "highlight_seconds": 5,
     "show_pid_column": True,
@@ -81,6 +88,9 @@ DEFAULTS = {
     "show_sparkline": True,       # connection-count sparkline in status bar
     "run_in_background": False,    # keep running when window closed
     "silent_mode": False,          # suppress all desktop notifications
+    "win_width": 0,                # last window size (0 = default)
+    "win_height": 0,
+    "win_maximized": False,
 }
 
 
@@ -96,6 +106,44 @@ def cache_dir() -> str:
     d = os.path.join(base, "geonetmon")
     os.makedirs(d, exist_ok=True)
     return d
+
+
+# ---- login autostart (XDG) -----------------------------------------------
+# The autostart .desktop file itself is the source of truth (no config key),
+# so the switch stays honest even if the user removes the file by hand.
+
+_AUTOSTART_DESKTOP = """[Desktop Entry]
+Type=Application
+Name=GeoNetMon
+Comment=Real-time geo-aware network monitor & interactive firewall
+Exec=geonetmon
+Icon=geonetmon
+Terminal=false
+X-GNOME-Autostart-enabled=true
+"""
+
+
+def autostart_path() -> str:
+    base = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+    return os.path.join(base, "autostart", "com.jegly.GeoNetMon.desktop")
+
+
+def autostart_enabled() -> bool:
+    return os.path.isfile(autostart_path())
+
+
+def set_autostart(enabled: bool) -> bool:
+    path = autostart_path()
+    try:
+        if enabled:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(_AUTOSTART_DESKTOP)
+        elif os.path.isfile(path):
+            os.remove(path)
+        return True
+    except OSError:
+        return False
 
 
 class Config:
@@ -120,6 +168,8 @@ class Config:
             tmp = self.path + ".tmp"
             with open(tmp, "w", encoding="utf-8") as fh:
                 json.dump(self.data, fh, indent=2)
+            # Owner-only: the config holds API tokens and the app-lock hash.
+            os.chmod(tmp, 0o600)
             os.replace(tmp, self.path)
         except OSError:
             pass

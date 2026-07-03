@@ -15,10 +15,12 @@
 [![Download GeoNetMon .deb](https://img.shields.io/badge/Download-Latest_.deb-A6E3A1?style=for-the-badge&logo=linux&logoColor=1E1E2E)](https://github.com/jegly/GeoNetMon/releases/latest)
 
 ```bash
-sudo dpkg -i geonetmon_1.0.2_all.deb
+sudo dpkg -i geonetmon_1.0.3_all.deb
 ```
 
 The package installs dependencies, creates the `geonetmon` system group, adds your user to it, and starts the background daemon. Log out and back in after install, then launch from your application menu or run `geonetmon`.
+
+**New in 1.0.3:** passive DNS capture (real hostnames for CDN IPs with the shield *off*), optional app-lock password with idle auto-lock, 14 new themes ported from Tesseract, a native system-tray menu that works on GTK4, grouped past connections, and a stack of smaller fixes (toggle-button theming, Escape closes dialogs, window size persistence, owner-only permissions on config/history files).
 
 ---
 
@@ -125,9 +127,15 @@ Outbound connections are held in the kernel queue until you respond. A prompt wi
 
 A plain-English summary under the dropdowns describes the exact rule before you confirm. An auto-timeout acts if you don't answer — the action (allow or deny) and duration are configurable.
 
+### Passive DNS capture
+
+The daemon watches DNS responses on every interface (a receive-only socket with a kernel BPF filter — only port-53 packets ever reach userspace) and remembers which hostname resolved to which IP. This works **with the shield off**, so CDN and cloud IPs that publish no reverse-DNS record still show the name your machine actually looked up — `firefox → github.com` instead of a bare Fastly IP. Local resolvers like dnscrypt-proxy and systemd-resolved are covered too: the app↔`127.0.0.1:53` leg is plaintext even when the upstream is encrypted.
+
+The hostname map lives in daemon memory only (capped, 15-minute TTL, never written to disk) and is served to the GUI over the existing group-gated socket. Toggle under Preferences → Enrichment.
+
 ### DNS-aware prompts
 
-The daemon sniffs DNS responses so prompts say `firefox → github.com` on the very first packet, not a bare IP. Blind spot: DNS-over-HTTPS/TLS is encrypted and invisible, same limitation as Little Snitch.
+The same capture feeds enforcement prompts, so they say `firefox → github.com` on the very first packet, not a bare IP. Blind spot: an app doing its *own* DNS-over-HTTPS internally (bypassing the system resolver) is invisible — same limitation as Little Snitch.
 
 ### Binary integrity
 
@@ -142,6 +150,8 @@ Separate from enforcement. Right-click any row in the connection table and choos
 Right-clicking any connection row opens a context menu with:
 
 - **Allow / Deny** — create a quick permanent rule for this connection without going through the full prompt
+- **Details / lsof** — open the full detail window with process info
+- **Copy IP** — copy the remote address to the clipboard
 - **Filter to this app** — narrow the table to show only connections from this process
 - **Block / Unblock IP** — immediate firewall block on the remote IP
 - **Whois** — open an in-app whois lookup for the remote IP
@@ -183,7 +193,7 @@ A rules table for viewing, adding, editing, and deleting named allow/deny rules.
 
 ### Past connections panel
 
-A collapsible in-session panel below the live table shows connections that appeared and then closed during the current session. Each entry can be expanded for full detail. The list can be cleared manually and does not persist across restarts (connection history is in the History tab instead).
+A collapsible in-session panel below the live table shows connections that appeared and then closed during the current session. Repeats of the same connection (same IP, port, protocol, app — think dnscrypt-proxy probing its resolvers every few seconds) coalesce into a single row with a `×N` count and an expander arrow that reveals every individual instance. Double-click any entry for full detail. The list can be cleared manually and does not persist across restarts (connection history is in the History tab instead).
 
 ### World connection map
 
@@ -216,11 +226,25 @@ A pause button in the header stops the table from refreshing without closing the
 
 ### Themes
 
-System (follows your GTK dark/light setting), Dracula, and all four Catppuccin flavours — Latte, Frappé, Macchiato, Mocha — with configurable accent colours. Switch live in Settings, no restart needed.
+Twenty themes, switchable live in Settings with no restart: System (follows your GTK dark/light setting), Dracula, all four Catppuccin flavours (Latte, Frappé, Macchiato, Mocha), plus fourteen ported from Tesseract — Adventure Time, Borland, Commodore 64, Fairy Floss Dark, Flat, Gogh — Starry Night, Grass, Gruvbox Material, Homebrew, Kokuban, Mono Cyan, Neon Tessera, Ocean, and Vintage Light. All support configurable accent colours.
+
+### App lock
+
+An optional password gate on the GUI (Preferences → Security). When enabled, the window opens to a lock screen; there's a "Lock now" menu item, and an idle timer can re-lock automatically after N minutes. The password is stored as a salted PBKDF2 hash — this guards casual access to the UI only, it does not encrypt anything on disk.
 
 ### System tray
 
-Optional system tray icon with show/hide, toggle enforcement, and quit. Requires `gir1.2-ayatanaappindicator3-0.1`.
+A native system-tray icon (monochrome symbolic, matches your panel) with a right-click menu: Show, Pause monitoring, Enforcement toggle, Lock now, and Quit — checkmarks stay in sync with the app. Implemented directly over D-Bus (StatusNotifierItem + DBusMenu), so it needs **no extra packages** and works in the GTK4 process — anywhere a StatusNotifier host exists (KDE, GNOME with the AppIndicator extension enabled — default on Ubuntu, XFCE, …). When enforcement is armed the icon gains a shield overlay. Pairs with "Run in background when window closed" so closing the window keeps monitoring alive in the tray.
+
+### Quality of life
+
+- Window size and maximized state are remembered across restarts
+- Every dialog closes on Escape
+- Export the alert log to CSV from the menu
+- "Start on login" toggle (XDG autostart) in Preferences
+- Reset the "first seen" memory to re-prime new-app/new-country alerts
+- AbuseIPDB and ipinfo.io open-in-browser buttons in the detail dialog
+- Config, history, and cache files are written owner-only (0600) — API tokens and connection history are not readable by other local users
 
 ---
 
@@ -230,7 +254,8 @@ Optional system tray icon with show/hide, toggle enforcement, and quit. Requires
 geonetmond  (root daemon, systemd service)
   ├── nftables NFQUEUE hook — holds outbound packets pending a decision
   ├── procmap — resolves PIDs via /proc/net/tcp and /proc/net/udp socket inodes
-  ├── DNS sniffer — caches hostname from DNS responses before the first packet
+  ├── passive DNS sniffer — AF_PACKET + kernel BPF filter, always on,
+  │     feeds ip→hostname to prompts AND the monitor view (memory-only)
   ├── publishes process names → /run/geonetmon-procs.json  (world-readable)
   └── Unix socket /run/geonetmon.sock  (NDJSON, group geonetmon, mode 0660)
 
@@ -286,7 +311,7 @@ Log out and back in after install for group membership to take effect.
 
 | Package | Purpose |
 |---|---|
-| `gir1.2-ayatanaappindicator3-0.1` | System tray icon |
+| `gir1.2-ayatanaappindicator3-0.1` | Legacy tray fallback only — the native tray needs nothing extra |
 
 ### Enabling enforcement
 
@@ -319,6 +344,7 @@ Then click the shield button in the app header to begin intercepting connections
 | `hide_loopback` | false | Hide loopback connections |
 | `resolve_geo` | true | Resolve country and organisation per connection |
 | `resolve_rdns` | true | Resolve reverse hostnames |
+| `dns_sniff` | true | Daemon-side passive DNS capture (hostnames without enforcement) |
 | `ipinfo_token` | "" | ipinfo.io API token (optional, for higher rate limits) |
 | `abuseipdb_token` | "" | AbuseIPDB API key (required for risk scoring) |
 | `geoip_db_path` | "" | Path to local GeoLite2-City.mmdb |
@@ -342,9 +368,13 @@ Then click the shield button in the app header to begin intercepting connections
 | `enforce_notify_deny_auto` | false | GNOME notification on auto-denied connections (off by default to avoid spam) |
 | `history_keep_days` | 30 | Connection history retention in days |
 | `highlight_seconds` | 5 | How long new connection rows flash before settling |
-| `theme` | system | UI theme: `system` / `dracula` / `catppuccin-mocha` / etc. |
+| `theme` | system | UI theme: `system` / `dracula` / `catppuccin-mocha` / `gruvbox-material` / etc. |
+| `accent` | "" | Accent colour override ("" = theme default) |
+| `app_lock_enabled` | false | Require the app-lock password on launch |
+| `app_lock_idle_min` | 0 | Re-lock after N idle minutes (0 = off) |
 | `run_in_background` | false | Keep running when the window is closed |
 | `silent_mode` | false | Suppress all desktop notifications |
+| `win_width` / `win_height` / `win_maximized` | — | Remembered window geometry |
 
 Config is stored at `~/.config/geonetmon/config.json`.
 
@@ -356,7 +386,7 @@ Config is stored at `~/.config/geonetmon/config.json`.
 git clone https://github.com/jegly/GeoNetMon
 cd GeoNetMon
 bash packaging/build-deb.sh
-sudo dpkg -i geonetmon_1.0.0_all.deb
+sudo dpkg -i geonetmon_1.0.3_all.deb
 ```
 
 Requires `dpkg-deb` and Python 3.10+ on the build machine. No compiled components — the package is pure Python.
@@ -377,7 +407,7 @@ Requires `dpkg-deb` and Python 3.10+ on the build machine. No compiled component
 | Rule storage | JSON (`~/.config/geonetmon/rules.json`) |
 | Connection history | SQLite |
 | IPC protocol | Unix socket, NDJSON |
-| System integration | systemd, `Gio.Notification` (GNOME), AppIndicator |
+| System integration | systemd, `Gio.Notification` (GNOME), native StatusNotifierItem + DBusMenu tray (Gio D-Bus) |
 | Themes | Pure GTK4 CSS with `@define-color` palettes |
 
 ---

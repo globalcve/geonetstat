@@ -11,6 +11,7 @@ from gi.repository import Gtk, GLib
 
 from . import rules as rules_mod
 from . import ports
+from .ui import escape_closes
 
 # gtk4-layer-shell places the prompt at the Wayland OVERLAY layer so it appears
 # above every other window without needing focus-steal tricks.
@@ -134,6 +135,9 @@ class PromptWindow(Gtk.Window):
         self._tick_countdown()
         self._timer = GLib.timeout_add_seconds(1, self._tick_countdown)
         self.connect("close-request", self._on_close)
+        # Escape = dismiss without deciding; _on_close applies the timeout
+        # action once, same as clicking the window's close button.
+        escape_closes(self)
 
     # ---- helpers --------------------------------------------------------
     def _sep(self):
